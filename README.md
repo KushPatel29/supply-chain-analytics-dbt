@@ -66,6 +66,16 @@ move between engines.
 `dbt build` won't ship marts whose tests fail — tests are the gate, not a
 report.
 
+## Advanced dbt features in use
+
+| Feature | Where | Why it matters |
+|---|---|---|
+| **Incremental model** | `fct_orders` — `delete+insert` on `order_id` with a 7-day late-arrival reprocess window | The pattern that makes a 100M-row fact affordable: only new/changed days rebuild |
+| **SCD Type 2 snapshot** | `snapshots/product_price_snapshot.sql` (`check` strategy on cost/price) | Repricing history is preserved, so margin can be recomputed as-of any order date |
+| **Semantic layer (MetricFlow)** | `models/semantic/` — entities, measures, and governed metrics (`total_revenue`, `otif_rate` as a ratio metric) + time spine | Metric definitions live in code, not in each BI tool separately |
+| **Analyses + findings memo** | `analyses/*.sql` + [`docs/INSIGHTS.md`](docs/INSIGHTS.md) | The "so what": four findings with reproducible numbers, incl. why this data is *not* 80/20 |
+| **Containerized build** | `Dockerfile` — `docker run --rm sca-dbt` executes the full build; CI does exactly this | Anyone (and any scheduler) reproduces the build with zero local setup |
+
 ## Orchestration (Airflow)
 
 [`orchestration/airflow/supply_chain_dbt_dag.py`](orchestration/airflow/supply_chain_dbt_dag.py)

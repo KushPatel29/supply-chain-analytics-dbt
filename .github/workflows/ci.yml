@@ -41,3 +41,13 @@ jobs:
 
       - name: Validate DAG imports and structure
         run: pytest orchestration/airflow/test_dag_integrity.py -v
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image and run full dbt build inside the container
+        run: |
+          docker build -t sca-dbt .
+          docker run --rm sca-dbt

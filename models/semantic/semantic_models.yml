@@ -1,0 +1,64 @@
+version: 2
+
+semantic_models:
+  - name: orders
+    description: Order-line grain for the MetricFlow semantic layer.
+    model: ref('fct_orders')
+    defaults:
+      agg_time_dimension: order_date
+    entities:
+      - name: order
+        type: primary
+        expr: order_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: product
+        type: foreign
+        expr: product_id
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+    measures:
+      - name: revenue
+        agg: sum
+      - name: gross_margin
+        agg: sum
+      - name: order_count
+        expr: "1"
+        agg: sum
+      - name: otif_orders
+        expr: otif_flag
+        agg: sum
+
+metrics:
+  - name: total_revenue
+    label: Total Revenue
+    description: Sum of shipped-line revenue.
+    type: simple
+    type_params:
+      measure: revenue
+  - name: total_gross_margin
+    label: Total Gross Margin
+    type: simple
+    type_params:
+      measure: gross_margin
+  - name: otif_orders_count
+    label: OTIF Orders
+    type: simple
+    type_params:
+      measure: otif_orders
+  - name: order_count_total
+    label: Order Count
+    type: simple
+    type_params:
+      measure: order_count
+  - name: otif_rate
+    label: OTIF Rate
+    description: Orders shipped on time and >= 95% filled, as a share of all orders.
+    type: ratio
+    type_params:
+      numerator: otif_orders_count
+      denominator: order_count_total
