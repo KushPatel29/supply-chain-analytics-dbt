@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: One row per order line from the ERP extract.
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+  - name: stg_products
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+  - name: stg_suppliers
+    columns:
+      - name: supplier_id
+        tests: [unique, not_null]
+  - name: stg_warehouses
+    columns:
+      - name: warehouse_id
+        tests: [unique, not_null]
+  - name: stg_lots
+    columns:
+      - name: lot_id
+        tests: [unique, not_null]

@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: >
+      Order-line fact with revenue/margin and the OTIF flag
+      (shipped on time AND fill rate >= 95%).
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_id
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_id
+      - name: warehouse_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_warehouse')
+              field: warehouse_id
+      - name: lot_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_lot')
+              field: lot_id
+      - name: otif_flag
+        tests:
+          - accepted_values:
+              values: [0, 1]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "qty_shipped <= qty_ordered"
+      - dbt_utils.expression_is_true:
+          expression: "fill_rate between 0 and 1"
+
+  - name: fct_inventory
+    columns:
+      - name: expiry_risk_flag
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Warning', 'OK']
+
+  - name: kpi_daily
+    columns:
+      - name: order_date
+        tests: [unique, not_null]
+      - name: otif_rate
+        tests: [not_null]
+
+exposures:
+  - name: supply_chain_control_tower_report
+    label: Supply Chain Control Tower (Power BI)
+    type: dashboard
+    maturity: high
+    url: https://github.com/KushPatel29/supply-chain-control-tower-
+    description: >
+      Power BI report (TMDL/PBIR, code-defined) consuming the marts
+      in this project. Lives in the supply-chain-control-tower repo.
+    depends_on:
+      - ref('fct_orders')
+      - ref('fct_inventory')
+      - ref('kpi_daily')
+    owner:
+      name: Kush Patel
+      email: dharma.patel552@gmail.com

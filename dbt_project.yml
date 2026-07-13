@@ -1,0 +1,22 @@
+name: supply_chain_analytics
+version: 1.0.0
+profile: supply_chain_analytics
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: target
+clean-targets: [target, dbt_packages]
+
+models:
+  supply_chain_analytics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+
+seeds:
+  supply_chain_analytics:
+    +quote_columns: false

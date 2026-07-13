@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  dbt-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt
+        run: pip install dbt-duckdb
+
+      - name: dbt deps
+        run: dbt deps --profiles-dir .
+
+      - name: dbt build (seed + run + test) on DuckDB
+        run: dbt build --profiles-dir .
+
+  airflow-dag-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow (constrained) + pytest
+        run: |
+          pip install "apache-airflow==2.10.5" --constraint \
+            "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+          pip install pytest
+
+      - name: Validate DAG imports and structure
+        run: pytest orchestration/airflow/test_dag_integrity.py -v

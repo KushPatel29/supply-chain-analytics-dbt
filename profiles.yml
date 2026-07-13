@@ -1,0 +1,22 @@
+# Self-contained profile: `dbt build --profiles-dir .`
+# Default target runs locally on DuckDB (zero setup).
+# The snowflake target is production-shaped: switch with
+#   dbt build --profiles-dir . --target snowflake
+# after exporting SNOWFLAKE_ACCOUNT / _USER / _PASSWORD.
+supply_chain_analytics:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: target/supply_chain.duckdb
+      threads: 4
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
+      role: TRANSFORMER
+      database: ANALYTICS
+      warehouse: TRANSFORMING
+      schema: supply_chain
+      threads: 8
