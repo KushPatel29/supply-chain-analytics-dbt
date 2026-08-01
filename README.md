@@ -1,5 +1,7 @@
 # Supply Chain Analytics — dbt
 
+### *The same star schema as my Fabric repo, rebuilt the analytics-engineering way — and then actually interrogated, because a mart nobody questions is furniture.*
+
 [![CI](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml/badge.svg)](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml)
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
@@ -18,6 +20,32 @@ Runs locally on **DuckDB with zero setup** (`dbt build`, done) and carries a
 production-shaped **Snowflake** target in the same profile — the SQL is
 cross-database (dbt dispatch macros), so switching warehouses is a CLI flag,
 not a rewrite.
+
+## The finding I did not expect
+
+Building the marts is the easy half. The half that matters is asking them
+something, and the first thing I asked came back the opposite of the assumption
+everyone brings to a distribution business:
+
+> **Revenue is not Pareto-concentrated. It takes 31 of 40 customers to reach 80%
+> of revenue.**
+
+There is no whale to protect. That single number changes the operational answer:
+fulfilment improvements have to be **systemic** — warehouse and process level —
+because there is no short list of key accounts whose babysitting would move the
+number. The usual 80/20 play would have been wasted effort here, and the only
+reason I know that is that I checked instead of assuming.
+
+Three more, each with a reproducible query in [`analyses/`](analyses/):
+
+| finding | why it changes the response |
+|---|---|
+| **OTIF averages 80.4%, and its worst day is 72.8%** | The floor triggers retailer chargebacks, not the mean. Averages hide exactly the days that cost money. |
+| **Critical-expiry inventory clusters in one site** — ~$823K at BC Interior DC 5 | A FEFO pick-priority rule at a *single* DC addresses most of the writedown exposure. Cheap fix, because the risk is concentrated. |
+| **Channel margins are flat: 23.5–23.7%** | "Sell more of the profitable channel" is not a lever when the channels earn within 0.2 points of each other. Cost and expiry waste are. |
+
+Full working in [`docs/INSIGHTS.md`](docs/INSIGHTS.md). Every number rebuilds
+from `dbt build`.
 
 ## Lineage
 
@@ -41,7 +69,7 @@ two repos double as a cross-engine consistency check.
 ```bash
 pip install dbt-duckdb
 dbt deps  --profiles-dir .
-dbt build --profiles-dir .          # seed + run + test: 53 passing
+dbt build --profiles-dir .          # seed + run + test: 32 tests, all gating
 dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .
 ```
 
