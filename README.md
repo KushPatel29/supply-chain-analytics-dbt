@@ -1,9 +1,11 @@
 # Supply Chain Analytics — dbt
 
+[![CI](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml/badge.svg)](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml)
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Snowflake](https://img.shields.io/badge/Snowflake-prod%20target-29B5E8?logo=snowflake&logoColor=white)
-![Airflow](https://img.shields.io/badge/Airflow-orchesrated%20nightly-017CEE?logo=apacheairflow&logoColor=white)
+![Airflow](https://img.shields.io/badge/Airflow-orchestrated%20nightly-017CEE?logo=apacheairflow&logoColor=white)
+![Tests](https://img.shields.io/badge/dbt%20tests-32%20across%2015%20models-3B8C6E)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower-)
