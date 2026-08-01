@@ -8,7 +8,7 @@
 ![Tests](https://img.shields.io/badge/dbt%20tests-32%20across%2015%20models-3B8C6E)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
-The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower-)
+The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower)
 star schema, rebuilt the analytics-engineering way: dbt seeds → staging views
 → dimensional marts, with tests as the deployment gate, generated docs and
 lineage, an exposure declaring the downstream Power BI report, and a

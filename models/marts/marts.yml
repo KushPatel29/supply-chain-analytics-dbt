@@ -62,7 +62,7 @@ exposures:
     label: Supply Chain Control Tower (Power BI)
     type: dashboard
     maturity: high
-    url: https://github.com/KushPatel29/supply-chain-control-tower-
+    url: https://github.com/KushPatel29/supply-chain-control-tower
     description: >
       Power BI report (TMDL/PBIR, code-defined) consuming the marts
       in this project. Lives in the supply-chain-control-tower repo.
