@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  # Weekly, so a green badge means the tests pass now rather
+  # than that they passed the day of the last push.
+  schedule:
+    - cron: "17 7 * * 6"
   push:
     branches: [master, main]
   pull_request:
@@ -23,6 +27,14 @@ jobs:
 
       - name: dbt build (seed + run + test) on DuckDB
         run: dbt build --profiles-dir .
+
+      - name: Export the project's own metadata
+        # Reads target/manifest.json, target/run_results.json and the DuckDB
+        # file dbt just wrote. Not diffed against the committed CSVs on
+        # purpose: they carry build timings, and a timing that reproduced
+        # byte-for-byte would mean it was not measured. What this asserts is
+        # that the exporter still runs against the manifest dbt produces today.
+        run: python exports/build_dbt_metadata.py
 
   airflow-dag-integrity:
     runs-on: ubuntu-latest

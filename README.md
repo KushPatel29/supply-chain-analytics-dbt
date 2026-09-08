@@ -106,6 +106,35 @@ report.
 | **Analyses + findings memo** | `analyses/*.sql` + [`docs/INSIGHTS.md`](docs/INSIGHTS.md) | The "so what": four findings with reproducible numbers, incl. why this data is *not* 80/20 |
 | **Containerized build** | `Dockerfile` — `docker run --rm sca-dbt` executes the full build; CI does exactly this | Anyone (and any scheduler) reproduces the build with zero local setup |
 
+## The project as data
+
+`dbt build` leaves its own account of what it did in `target/manifest.json` and
+`target/run_results.json` — every model, every test, every edge of the graph,
+with build status and timings. That is a warehouse describing itself, and it is
+JSON nobody can query.
+
+[`exports/build_dbt_metadata.py`](exports/build_dbt_metadata.py) flattens it
+into four CSVs so the project can be asked questions the way its own marts can:
+
+| File | One row per | Answers |
+|---|---|---|
+| `models.csv` | model | which layer, which materialization, how many parents, children, tests and columns — and whether it built |
+| `tests.csv` | test | what it asserts, against which model, and whether it passed |
+| `lineage.csv` | edge | what feeds what, so the graph is joinable rather than only drawable |
+| `kpi_daily.csv` | day | the one mart whose grain exists nowhere else in the portfolio |
+
+It deliberately skips the seeds and the passthrough dimensions: those are the
+same rows as the raw ERP extract and are already published by the Control Tower
+repository. Exporting them again would be two copies of one fact, which is the
+thing a warehouse exists to prevent.
+
+CI runs it after `dbt build`, so a change that breaks the exporter fails the
+build rather than being discovered the next time someone opens the folder. The
+committed CSVs carry the build date and per-model timings of the run that wrote
+them, which is why they are not asserted byte-for-byte the way the other
+generated artefacts in this portfolio are — a timing that reproduced exactly
+would mean it was not measured.
+
 ## Orchestration (Airflow)
 
 [`orchestration/airflow/supply_chain_dbt_dag.py`](orchestration/airflow/supply_chain_dbt_dag.py)
@@ -129,6 +158,7 @@ models/staging/       typed/renamed views, 1:1 with sources
 models/marts/         star schema: dims + facts + kpi_daily rollup
 macros/               expiry_band() — FEFO risk banding, DRY across models
 tests/                singular tests: control totals + OTIF definition
+exports/              the project's own metadata as CSV — models, tests, lineage
 orchestration/airflow/  nightly DAG + DagBag integrity tests (run in CI)
 profiles.yml          duckdb (default) + snowflake targets
 .github/workflows/    CI: full dbt build on DuckDB + Airflow DAG validation
