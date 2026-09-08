@@ -1,28 +1,180 @@
 version: 2
 
+# Staging is where a bad seed should be stopped. Every key is tested for
+# uniqueness and presence, every foreign key is tested against the dimension it
+# points at, and every number a downstream model multiplies is range-bounded —
+# because a negative unit_price does not fail anything by itself, it just
+# quietly produces negative revenue three models later.
+
 models:
   - name: stg_orders
     description: One row per order line from the ERP extract.
     columns:
       - name: order_id
+        description: Natural key of the order line.
         tests: [unique, not_null]
+      - name: order_date
+        tests: [not_null]
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_customers'), field: customer_id}
+      - name: product_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_products'), field: product_id}
+      - name: lot_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_lots'), field: lot_id}
+      - name: warehouse_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_warehouses'), field: warehouse_id}
+      - name: qty_ordered
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: qty_shipped
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: promised_date
+        tests: [not_null]
+      - name: shipped_date
+        description: >
+          Null while an order is still open. Legitimately null, so it is held
+          to a proportion rather than not_null — a feed that started dropping
+          it entirely would still be caught.
+        tests:
+          - dbt_utils.not_null_proportion: {at_least: 0.5}
+      - name: unit_price
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+      - name: unit_cost
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+    tests:
+      # An order cannot ship more than was ordered, and cannot be promised
+      # before it was placed.
+      - dbt_utils.expression_is_true:
+          expression: "qty_shipped <= qty_ordered"
+      - dbt_utils.expression_is_true:
+          expression: "promised_date >= order_date"
+      - dbt_utils.expression_is_true:
+          expression: "shipped_date is null or shipped_date >= order_date"
+
   - name: stg_products
     columns:
       - name: product_id
         tests: [unique, not_null]
+      - name: sku
+        tests: [unique, not_null]
+      - name: product_name
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: shelf_life_days
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+      - name: unit_cost
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+      - name: unit_price
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+    tests:
+      # Selling below cost is a decision, not a data error — but it is never
+      # the intent of a price list, so it is worth a build failure.
+      - dbt_utils.expression_is_true:
+          expression: "unit_price >= unit_cost"
+
   - name: stg_customers
     columns:
       - name: customer_id
         tests: [unique, not_null]
+      - name: customer_name
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: region
+        tests: [not_null]
+
   - name: stg_suppliers
     columns:
       - name: supplier_id
         tests: [unique, not_null]
+      - name: supplier_name
+        tests: [not_null]
+      - name: region
+        tests: [not_null]
+
   - name: stg_warehouses
     columns:
       - name: warehouse_id
         tests: [unique, not_null]
+      - name: warehouse_name
+        tests: [not_null]
+      - name: region
+        tests: [not_null]
+
   - name: stg_lots
+    description: One row per production lot, with the dates shelf-life logic reads.
     columns:
       - name: lot_id
         tests: [unique, not_null]
+      - name: product_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_products'), field: product_id}
+      - name: supplier_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_suppliers'), field: supplier_id}
+      - name: warehouse_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_warehouses'), field: warehouse_id}
+      - name: production_date
+        tests: [not_null]
+      - name: expiry_date
+        tests: [not_null]
+    tests:
+      # A lot cannot be received before it was made, and cannot expire before
+      # it was made. Both orderings feed the days-until-expiry arithmetic.
+      - dbt_utils.expression_is_true:
+          expression: "received_date >= production_date"
+      - dbt_utils.expression_is_true:
+          expression: "expiry_date > production_date"
+
+  - name: stg_inventory
+    description: Daily on-hand snapshot by lot and warehouse.
+    columns:
+      - name: snapshot_date
+        tests: [not_null]
+      - name: lot_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_lots'), field: lot_id}
+      - name: product_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_products'), field: product_id}
+      - name: warehouse_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_warehouses'), field: warehouse_id}
+      - name: qty_on_hand
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+    tests:
+      # The snapshot grain. If this stops holding, every inventory value in the
+      # marts is double-counted and nothing else would say so.
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, lot_id, warehouse_id]

@@ -7,7 +7,7 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20CI--run-29B5E8?logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-orchestrated%20nightly-017CEE?logo=apacheairflow&logoColor=white)
-![Tests](https://img.shields.io/badge/dbt%20tests-32%20across%2015%20models-3B8C6E)
+![Tests](https://img.shields.io/badge/dbt%20tests-154%20across%2015%20models-3B8C6E)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower)
@@ -23,6 +23,44 @@ rather than a rewrite — but read that as a design property, not a demonstrated
 one: **CI only ever builds the DuckDB target.** I do not have a Snowflake
 account to point it at, so the second target is provided and unexercised, and
 saying so is cheaper than letting a badge imply a nightly production run.
+
+## What the 154 tests actually check
+
+Three kinds, because they fail at different things.
+
+**148 data tests** — the generic and singular ones — describe properties the
+warehouse must have. Keys are unique and present, every foreign key resolves to
+the dimension it names, every number a downstream model multiplies is
+range-bounded, and each fact holds its stated grain. On top of those sit five
+control totals that no single-model test can see: `kpi_daily` recomputed from
+`fct_orders` and required to agree day by day, a set difference in both
+directions between staging and the fact so an incremental `delete+insert` cannot
+quietly drop a line, inventory revalued from the product dimension, the expiry
+bands restated independently of the macro that produced them, and an SCD Type 2
+check on the price snapshot for the three ways a snapshot goes wrong — two rows
+open at once, a window that ends before it starts, two windows that overlap.
+
+**6 unit tests** run the model SQL against fixed inputs, which the data tests
+structurally cannot. Nothing above would notice if the OTIF threshold moved from
+0.95 to 0.90: every row would still carry a valid-looking flag. So the boundaries
+are pinned directly — exactly on the promise date, exactly 95% filled, a hair
+under at 0.9499, a full order shipped a day late, an order never shipped, and a
+cancelled line whose zero quantity must not divide by zero. Money is pinned the
+same way, including the case that matters most: a partly shipped line has to be
+priced on what left the warehouse, not on what was asked for.
+
+Each of these was checked by breaking the thing it guards. Moving the OTIF
+threshold, pricing revenue on `qty_ordered`, shifting an expiry band, rounding
+`otif_rate` to two places, valuing inventory at price instead of cost, and
+deleting an order line each fail exactly the test that exists for it, and no
+others.
+
+**One tolerance is derived rather than chosen.** Revenue, COGS and margin are
+each rounded to the cent independently, so `revenue - cogs - gross_margin` can
+legitimately land anywhere within 1.5 cents. Asserted at one cent it failed 288
+of 20,000 rows at a measured maximum of 0.010000000001 — one cent, plus the
+float representation of one cent. The model was right and the bound was a hair
+too tight; the test now carries the arithmetic that justifies its threshold.
 
 ## The finding I did not expect
 
@@ -72,7 +110,7 @@ two repos double as a cross-engine consistency check.
 ```bash
 pip install dbt-duckdb
 dbt deps  --profiles-dir .
-dbt build --profiles-dir .          # seed + run + test: 32 tests, all gating
+dbt build --profiles-dir .          # seed + run + test: 154 tests, all gating
 dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .
 ```
 

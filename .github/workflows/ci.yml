@@ -28,6 +28,28 @@ jobs:
       - name: dbt build (seed + run + test) on DuckDB
         run: dbt build --profiles-dir .
 
+      # The badge is a claim about this project, and nothing compared the two.
+      # In a sibling repository a badge sat 163 tests behind its suite for
+      # months because the only guard counted the wrong thing. `dbt ls` is the
+      # source of truth for both resource types.
+      #
+      # The badge number is cut out with sed rather than grepped for digits:
+      # a shields URL contains %20 for every space, so a digit-run match reads
+      # "154" as 20, 154, 20 and compares the wrong one.
+      - name: The README test badge must match what dbt parses
+        run: |
+          data=$(dbt ls --profiles-dir . --resource-type test | grep -c 'supply_chain_analytics')
+          unit=$(dbt ls --profiles-dir . --resource-type unit_test | grep -c 'supply_chain_analytics')
+          total=$((data + unit))
+          claimed=$(grep -oE 'dbt%20tests-[0-9]+%20across' README.md | head -1             | sed -E 's|dbt%20tests-||; s|%20across||')
+          echo "dbt lists: ${data} data + ${unit} unit = ${total}   README badge: ${claimed:-<none>}"
+          if [ -z "$claimed" ]; then
+            echo "::error::no dbt test badge found in README.md"; exit 1
+          fi
+          if [ "$total" != "$claimed" ]; then
+            echo "::error::README badge says $claimed, dbt lists $total"; exit 1
+          fi
+
       - name: Export the project's own metadata
         # Reads target/manifest.json, target/run_results.json and the DuckDB
         # file dbt just wrote. Not diffed against the committed CSVs on

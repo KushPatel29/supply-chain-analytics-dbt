@@ -1,5 +1,10 @@
 version: 2
 
+# The marts are what the Power BI report and the metric layer read, so the
+# tests here are about arithmetic that has to survive a refresh: the money
+# identities, the rate bounds, and the grain of each table. The logic that
+# produces those numbers is pinned separately in unit_tests.yml.
+
 models:
   - name: fct_orders
     description: >
@@ -34,28 +39,150 @@ models:
               field: lot_id
       - name: otif_flag
         tests:
+          - not_null
           - accepted_values:
               values: [0, 1]
+      - name: order_date
+        tests: [not_null]
+      - name: revenue
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: cogs
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: gross_margin
+        tests: [not_null]
+      - name: fill_rate
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}
     tests:
       - dbt_utils.expression_is_true:
           expression: "qty_shipped <= qty_ordered"
       - dbt_utils.expression_is_true:
           expression: "fill_rate between 0 and 1"
+      # The money identity, with the tolerance derived rather than guessed.
+      # Revenue, COGS and margin are each rounded to the cent independently,
+      # so each carries up to half a cent of error and the expression
+      # revenue - cogs - margin can legitimately land anywhere in +/- 1.5
+      # cents. Written as <= 0.01 this failed 288 of 20,000 rows at a measured
+      # maximum of 0.010000000001 -- one cent, plus the float representation of
+      # one cent. The model is right; the bound was a hair too tight.
+      # Anything beyond 1.5 cents means one of the three stopped being derived
+      # from the same quantity, which no other test here would notice.
+      - dbt_utils.expression_is_true:
+          expression: "abs(revenue - cogs - gross_margin) <= 0.015"
+      # A line billed for nothing shipped, or shipping something billed at
+      # nothing, is a broken join rather than a real order.
+      - dbt_utils.expression_is_true:
+          expression: "(qty_shipped = 0 and revenue = 0) or (qty_shipped > 0 and revenue > 0)"
 
   - name: fct_inventory
+    description: Daily on-hand position by lot, valued at product cost.
     columns:
+      - name: snapshot_date
+        tests: [not_null]
+      - name: lot_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_lot'), field: lot_id}
+      - name: product_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_id}
+      - name: warehouse_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_warehouse'), field: warehouse_id}
+      - name: qty_on_hand
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: inventory_value
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: true}
+      - name: days_until_expiry
+        tests: [not_null]
       - name: expiry_risk_flag
         tests:
           - not_null
           - accepted_values:
               values: ['Critical', 'Warning', 'OK']
+    tests:
+      # The join to lots and products must not fan out — one row per lot per
+      # warehouse per day, the same grain the snapshot arrived at.
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, lot_id, warehouse_id]
+
+  - name: dim_product
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+      - name: sku
+        tests: [unique, not_null]
+      - name: product_name
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+
+  - name: dim_customer
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: customer_name
+        tests: [not_null]
+      - name: region
+        tests: [not_null]
+
+  - name: dim_warehouse
+    columns:
+      - name: warehouse_id
+        tests: [unique, not_null]
+      - name: warehouse_name
+        tests: [not_null]
+      - name: region
+        tests: [not_null]
+
+  - name: dim_lot
+    description: >
+      Lot dimension with its supplier attached. The join to suppliers is a left
+      join, so supplier_name is tested for presence rather than assumed.
+    columns:
+      - name: lot_id
+        tests: [unique, not_null]
+      - name: product_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_product'), field: product_id}
+      - name: supplier_name
+        tests: [not_null]
+      - name: expiry_date
+        tests: [not_null]
 
   - name: kpi_daily
+    description: Daily rollup — the grain an executive trend page reads.
     columns:
       - name: order_date
         tests: [unique, not_null]
-      - name: otif_rate
+      - name: orders
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, inclusive: true}
+      - name: revenue
         tests: [not_null]
+      - name: gross_margin
+        tests: [not_null]
+      - name: otif_rate
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}
+      - name: avg_fill_rate
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}
 
 exposures:
   - name: supply_chain_control_tower_report

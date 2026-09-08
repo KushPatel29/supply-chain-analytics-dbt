@@ -1,0 +1,181 @@
+version: 2
+
+# Unit tests run the model's SQL against fixed inputs, so they pin the logic
+# itself rather than the shape of whatever happens to be in the warehouse. The
+# generic and singular tests in this project all check properties of the real
+# data; none of them would notice if the OTIF threshold were changed from 0.95
+# to 0.90, because the result would still be a valid-looking flag on every row.
+#
+# fct_orders is incremental, so each test pins is_incremental to false: these
+# assert the transformation, not the merge behaviour, and the incremental path
+# is covered separately by a second run in CI.
+
+unit_tests:
+
+  # ---------------------------------------------------------------------
+  # OTIF. The definition is "shipped on or before the promise AND filled at
+  # least 95%", and every boundary in that sentence is somewhere a mistake
+  # hides: >= versus >, the promise date itself, and a fill rate that lands
+  # exactly on the threshold.
+  # ---------------------------------------------------------------------
+  - name: otif_holds_at_every_boundary_of_its_definition
+    model: fct_orders
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_orders')
+        rows:
+          # Exactly on the promise date, exactly 95% filled — both bounds
+          # touched at once. This is the row that fails if either
+          # comparison is written strictly.
+          - {order_id: 1, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 100, qty_shipped: 95, promised_date: '2026-03-05', shipped_date: '2026-03-05',
+             unit_price: 10.00, unit_cost: 6.00}
+          # A hair under the threshold: 9499/10000 = 0.9499.
+          - {order_id: 2, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 10000, qty_shipped: 9499, promised_date: '2026-03-05', shipped_date: '2026-03-05',
+             unit_price: 10.00, unit_cost: 6.00}
+          # Filled completely, delivered one day late.
+          - {order_id: 3, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 100, qty_shipped: 100, promised_date: '2026-03-05', shipped_date: '2026-03-06',
+             unit_price: 10.00, unit_cost: 6.00}
+          # Never shipped. A null must not be treated as "not late".
+          - {order_id: 4, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 100, qty_shipped: 0, promised_date: '2026-03-05', shipped_date: null,
+             unit_price: 10.00, unit_cost: 6.00}
+          # Delivered early and complete — the unambiguous yes.
+          - {order_id: 5, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 100, qty_shipped: 100, promised_date: '2026-03-05', shipped_date: '2026-03-02',
+             unit_price: 10.00, unit_cost: 6.00}
+    expect:
+      rows:
+        - {order_id: 1, fill_rate: 0.95,   otif_flag: 1}
+        - {order_id: 2, fill_rate: 0.9499, otif_flag: 0}
+        - {order_id: 3, fill_rate: 1.0,    otif_flag: 0}
+        - {order_id: 4, fill_rate: 0.0,    otif_flag: 0}
+        - {order_id: 5, fill_rate: 1.0,    otif_flag: 1}
+
+  # ---------------------------------------------------------------------
+  # A cancelled line has nothing ordered. Dividing by it would take the whole
+  # build down, so the model guards it — and the guard has to return a fill
+  # rate of zero rather than the 1.0 that "nothing was missed" would suggest.
+  # ---------------------------------------------------------------------
+  - name: a_zero_quantity_order_does_not_divide_by_zero
+    model: fct_orders
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 0, qty_shipped: 0, promised_date: '2026-03-05', shipped_date: '2026-03-04',
+             unit_price: 10.00, unit_cost: 6.00}
+    expect:
+      rows:
+        - {order_id: 1, fill_rate: 0.0, otif_flag: 0, revenue: 0.0, cogs: 0.0, gross_margin: 0.0}
+
+  # ---------------------------------------------------------------------
+  # Money. Revenue, COGS and margin are each rounded to the cent
+  # independently, so the identity revenue - cogs = gross_margin is not
+  # free — it holds only while all three round the same way. Quantities are
+  # chosen so the unrounded products carry a third decimal.
+  # ---------------------------------------------------------------------
+  - name: revenue_cogs_and_margin_round_to_the_cent_consistently
+    model: fct_orders
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_orders')
+        rows:
+          # 7 x 12.34 = 86.38 exactly; 7 x 8.21 = 57.47; margin 7 x 4.13 = 28.91.
+          - {order_id: 1, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 7, qty_shipped: 7, promised_date: '2026-03-05', shipped_date: '2026-03-04',
+             unit_price: 12.34, unit_cost: 8.21}
+          # 3 x 1.111 = 3.333 -> 3.33; 3 x 0.777 = 2.331 -> 2.33; margin 3 x 0.334 = 1.002 -> 1.00.
+          - {order_id: 2, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 3, qty_shipped: 3, promised_date: '2026-03-05', shipped_date: '2026-03-04',
+             unit_price: 1.111, unit_cost: 0.777}
+    expect:
+      rows:
+        - {order_id: 1, revenue: 86.38, cogs: 57.47, gross_margin: 28.91}
+        - {order_id: 2, revenue: 3.33,  cogs: 2.33,  gross_margin: 1.00}
+
+  # ---------------------------------------------------------------------
+  # Only shipped units are billed. A partially shipped line must price the
+  # quantity that left the warehouse, not the quantity the customer asked
+  # for — the most expensive single mistake available in this model.
+  # ---------------------------------------------------------------------
+  - name: revenue_prices_what_shipped_not_what_was_ordered
+    model: fct_orders
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, order_date: '2026-03-01', customer_id: 1, product_id: 1, lot_id: 1, warehouse_id: 1,
+             qty_ordered: 100, qty_shipped: 40, promised_date: '2026-03-05', shipped_date: '2026-03-04',
+             unit_price: 10.00, unit_cost: 6.00}
+    expect:
+      rows:
+        - {order_id: 1, revenue: 400.00, cogs: 240.00, gross_margin: 160.00, fill_rate: 0.4, otif_flag: 0}
+
+  # ---------------------------------------------------------------------
+  # kpi_daily is what a trend page reads, so its rates have to be computed
+  # over the day, not averaged over rows that already hold rates. With two
+  # of three lines OTIF the rate is 0.6667 — and the average fill rate is a
+  # genuinely different number from the day's overall fill rate, which is
+  # why the column is named avg_fill_rate.
+  # ---------------------------------------------------------------------
+  - name: daily_rollup_computes_rates_over_the_day
+    model: kpi_daily
+    given:
+      - input: ref('fct_orders')
+        rows:
+          - {order_date: '2026-03-01', revenue: 100.00, gross_margin: 40.00, otif_flag: 1, fill_rate: 1.0}
+          - {order_date: '2026-03-01', revenue: 50.00,  gross_margin: 20.00, otif_flag: 1, fill_rate: 0.5}
+          - {order_date: '2026-03-01', revenue: 25.00,  gross_margin: 10.00, otif_flag: 0, fill_rate: 0.0}
+          - {order_date: '2026-03-02', revenue: 10.00,  gross_margin: 4.00,  otif_flag: 0, fill_rate: 0.9}
+    expect:
+      rows:
+        - {order_date: '2026-03-01', orders: 3, revenue: 175.00, gross_margin: 70.00, otif_rate: 0.6667, avg_fill_rate: 0.5}
+        - {order_date: '2026-03-02', orders: 1, revenue: 10.00,  gross_margin: 4.00,  otif_rate: 0.0,    avg_fill_rate: 0.9}
+
+  # ---------------------------------------------------------------------
+  # The expiry bands are a macro, so they are one edit away from moving
+  # under every report that reads them. Both cut points are pinned from
+  # either side; 3 and 6 are the days that change band if a <= becomes <.
+  # ---------------------------------------------------------------------
+  - name: expiry_bands_sit_where_the_macro_says_they_do
+    model: fct_inventory
+    given:
+      - input: ref('stg_inventory')
+        rows:
+          - {snapshot_date: '2026-03-01', lot_id: 1, product_id: 1, warehouse_id: 1, qty_on_hand: 10}
+          - {snapshot_date: '2026-03-01', lot_id: 2, product_id: 1, warehouse_id: 1, qty_on_hand: 10}
+          - {snapshot_date: '2026-03-01', lot_id: 3, product_id: 1, warehouse_id: 1, qty_on_hand: 10}
+          - {snapshot_date: '2026-03-01', lot_id: 4, product_id: 1, warehouse_id: 1, qty_on_hand: 10}
+          - {snapshot_date: '2026-03-01', lot_id: 5, product_id: 1, warehouse_id: 1, qty_on_hand: 10}
+      - input: ref('stg_lots')
+        rows:
+          - {lot_id: 1, product_id: 1, supplier_id: 1, warehouse_id: 1, production_date: '2026-01-01', received_date: '2026-01-02', expiry_date: '2026-03-03'}  # 2 days
+          - {lot_id: 2, product_id: 1, supplier_id: 1, warehouse_id: 1, production_date: '2026-01-01', received_date: '2026-01-02', expiry_date: '2026-03-04'}  # 3 days
+          - {lot_id: 3, product_id: 1, supplier_id: 1, warehouse_id: 1, production_date: '2026-01-01', received_date: '2026-01-02', expiry_date: '2026-03-06'}  # 5 days
+          - {lot_id: 4, product_id: 1, supplier_id: 1, warehouse_id: 1, production_date: '2026-01-01', received_date: '2026-01-02', expiry_date: '2026-03-07'}  # 6 days
+          - {lot_id: 5, product_id: 1, supplier_id: 1, warehouse_id: 1, production_date: '2026-01-01', received_date: '2026-01-02', expiry_date: '2026-02-27'}  # expired
+      - input: ref('stg_products')
+        rows:
+          - {product_id: 1, sku: 'SKU-1', product_name: 'Test', category: 'C', subcategory: 'S',
+             shelf_life_days: 30, unit_of_measure: 'kg', unit_cost: 2.50, unit_price: 5.00}
+    expect:
+      rows:
+        - {lot_id: 1, days_until_expiry: 2,  expiry_risk_flag: 'Critical', inventory_value: 25.00}
+        - {lot_id: 2, days_until_expiry: 3,  expiry_risk_flag: 'Warning',  inventory_value: 25.00}
+        - {lot_id: 3, days_until_expiry: 5,  expiry_risk_flag: 'Warning',  inventory_value: 25.00}
+        - {lot_id: 4, days_until_expiry: 6,  expiry_risk_flag: 'OK',       inventory_value: 25.00}
+        # Already expired: negative days must still land in the worst band,
+        # not fall through to OK.
+        - {lot_id: 5, days_until_expiry: -2, expiry_risk_flag: 'Critical', inventory_value: 25.00}
