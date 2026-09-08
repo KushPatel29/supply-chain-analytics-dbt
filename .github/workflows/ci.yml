@@ -74,7 +74,7 @@ jobs:
           pip install pytest
 
       - name: Validate DAG imports and structure
-        run: pytest orchestration/airflow/test_dag_integrity.py -v
+        run: pytest orchestration/airflow/test_dag_integrity.py orchestration/airflow/test_orchestration_claims.py -v
 
   docker-build:
     runs-on: ubuntu-latest

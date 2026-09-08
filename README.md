@@ -6,7 +6,7 @@
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20CI--run-29B5E8?logo=snowflake&logoColor=white)
-![Airflow](https://img.shields.io/badge/Airflow-orchestrated%20nightly-017CEE?logo=apacheairflow&logoColor=white)
+![Airflow](https://img.shields.io/badge/Airflow-DAG%20validated%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/dbt%20tests-154%20across%2015%20models-3B8C6E)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
