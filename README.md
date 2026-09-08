@@ -5,7 +5,7 @@
 [![CI](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml/badge.svg)](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml)
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
-![Snowflake](https://img.shields.io/badge/Snowflake-prod%20target-29B5E8?logo=snowflake&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20CI--run-29B5E8?logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-orchestrated%20nightly-017CEE?logo=apacheairflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/dbt%20tests-32%20across%2015%20models-3B8C6E)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
@@ -17,9 +17,12 @@ lineage, an exposure declaring the downstream Power BI report, and a
 production-shaped Airflow DAG that CI structurally validates.
 
 Runs locally on **DuckDB with zero setup** (`dbt build`, done) and carries a
-production-shaped **Snowflake** target in the same profile — the SQL is
-cross-database (dbt dispatch macros), so switching warehouses is a CLI flag,
-not a rewrite.
+production-shaped **Snowflake** target in the same profile. The SQL is written
+cross-database (dbt dispatch macros), so switching warehouses is a CLI flag
+rather than a rewrite — but read that as a design property, not a demonstrated
+one: **CI only ever builds the DuckDB target.** I do not have a Snowflake
+account to point it at, so the second target is provided and unexercised, and
+saying so is cheaper than letting a badge imply a nightly production run.
 
 ## The finding I did not expect
 
