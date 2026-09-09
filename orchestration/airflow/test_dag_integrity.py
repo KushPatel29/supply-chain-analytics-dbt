@@ -1,8 +1,20 @@
-"""DagBag integrity test — run by CI on Linux with Airflow installed."""
+"""DagBag integrity test — run by CI on Linux with Airflow installed.
+
+Airflow is a heavy, platform-sensitive dependency that this repository does not
+ask a reader to install: the `airflow-dag-integrity` job installs it under the
+official constraints file and runs this file explicitly. Everywhere else it is
+absent, and a bare `from airflow.models import ...` made that a *collection
+error* — which aborts the entire run, so `pytest` in a fresh clone reported one
+error and zero tests rather than skipping the one file it cannot run.
+"""
 
 from pathlib import Path
 
-from airflow.models import DagBag
+import pytest
+
+DagBag = pytest.importorskip(
+    "airflow.models", reason="Airflow is installed only in the CI job that runs this file"
+).DagBag
 
 
 def test_dag_loads_without_errors():
