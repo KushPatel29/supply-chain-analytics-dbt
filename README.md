@@ -7,7 +7,8 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20CI--run-29B5E8?logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-DAG%20validated%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
-![Tests](https://img.shields.io/badge/dbt%20tests-154%20across%2015%20models-3B8C6E)
+![Tests](https://img.shields.io/badge/dbt%20tests-157%20across%2015%20models-3B8C6E)
+![Release](https://img.shields.io/badge/release%20packet-APPROVE-167D5A)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower)
@@ -15,6 +16,30 @@ star schema, rebuilt the analytics-engineering way: dbt seeds → staging views
 → dimensional marts, with tests as the deployment gate, generated docs and
 lineage, an exposure declaring the downstream Power BI report, and a
 production-shaped Airflow DAG that CI structurally validates.
+
+It now also behaves like a releasable data product. The executive KPI mart has
+an **enforced contract**; governed revenue and OTIF definitions reconcile to
+their physical marts; a deterministic state comparison identifies changed
+nodes and downstream impact; and every build emits a SHA-256 integrity-hashed release
+packet plus model-level run-lineage evidence.
+
+## Release control room
+
+| Decision evidence | Latest result |
+|---|---|
+| Release gate | **APPROVE** — all five executable gates passed |
+| Contract | `kpi_daily` column names and types enforced at materialization |
+| Semantic reconciliation | **$0.00 revenue delta**; **0.000004 OTIF delta** |
+| Governed catalog | 5 MetricFlow metrics + 1 downstream Power BI exposure |
+| Run lineage | 15 model-level events with inputs, output and execution status |
+| Change safety | checksum baseline + tested downstream graph traversal |
+
+Review the [release memo](output/analytics_engineering_release_memo.md),
+[machine-readable packet](output/analytics_engineering_release_packet.json),
+[change-impact inventory](output/change_impact.csv), and
+[operator runbook](docs/RELEASE_OPERATIONS.md). The packet states the evidence
+boundary plainly: DuckDB is executed; the Snowflake target is not. Airflow is
+imported and structurally tested; it is not scheduled from this portfolio.
 
 Runs locally on **DuckDB with zero setup** (`dbt build`, done) and carries a
 production-shaped **Snowflake** target in the same profile. The SQL is written
@@ -24,11 +49,11 @@ one: **CI only ever builds the DuckDB target.** I do not have a Snowflake
 account to point it at, so the second target is provided and unexercised, and
 saying so is cheaper than letting a badge imply a nightly production run.
 
-## What the 154 tests actually check
+## What the 157 tests actually check
 
 Three kinds, because they fail at different things.
 
-**148 data tests** — the generic and singular ones — describe properties the
+**151 data tests** — the generic and singular ones — describe properties the
 warehouse must have. Keys are unique and present, every foreign key resolves to
 the dimension it names, every number a downstream model multiplies is
 range-bounded, and each fact holds its stated grain. On top of those sit five
@@ -36,9 +61,13 @@ control totals that no single-model test can see: `kpi_daily` recomputed from
 `fct_orders` and required to agree day by day, a set difference in both
 directions between staging and the fact so an incremental `delete+insert` cannot
 quietly drop a line, inventory revalued from the product dimension, the expiry
-bands restated independently of the macro that produced them, and an SCD Type 2
+bands restated independently of the macro that produced them, an SCD Type 2
 check on the price snapshot for the three ways a snapshot goes wrong — two rows
 open at once, a window that ends before it starts, two windows that overlap.
+Three semantic controls then protect the reporting contract itself: daily fill
+rate is recomputed at order grain, total revenue ties between the governed
+definition and KPI mart, and the overall OTIF ratio is weighted by orders rather
+than calculated as a misleading average of rounded daily percentages.
 
 **6 unit tests** run the model SQL against fixed inputs, which the data tests
 structurally cannot. Nothing above would notice if the OTIF threshold moved from
@@ -110,7 +139,8 @@ two repos double as a cross-engine consistency check.
 ```bash
 pip install dbt-duckdb
 dbt deps  --profiles-dir .
-dbt build --profiles-dir .          # seed + run + test: 154 tests, all gating
+dbt build --profiles-dir .          # seed + run + test: 157 tests, all gating
+python governance/build_release_evidence.py  # APPROVE or fail closed
 dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .
 ```
 
@@ -144,6 +174,8 @@ report.
 | **Incremental model** | `fct_orders` — `delete+insert` on `order_id` with a 7-day late-arrival reprocess window | The pattern that makes a 100M-row fact affordable: only new/changed days rebuild |
 | **SCD Type 2 snapshot** | `snapshots/product_price_snapshot.sql` (`check` strategy on cost/price) | Repricing history is preserved, so margin can be recomputed as-of any order date |
 | **Semantic layer (MetricFlow)** | `models/semantic/` — entities, measures, and governed metrics (`total_revenue`, `otif_rate` as a ratio metric) + time spine | Metric definitions live in code, not in each BI tool separately |
+| **Enforced data contract** | `kpi_daily` — names and warehouse types checked before replacement | A silent schema drift fails the build before it reaches the executive report |
+| **Release governance** | `governance/` + `output/` — state comparison, fan-out, reconciliations, integrity-hashed packet and run lineage | A reviewer can answer what changed, what it affects and why the build is releasable |
 | **Analyses + findings memo** | `analyses/*.sql` + [`docs/INSIGHTS.md`](docs/INSIGHTS.md) | The "so what": four findings with reproducible numbers, incl. why this data is *not* 80/20 |
 | **Containerized build** | `Dockerfile` — `docker run --rm sca-dbt` executes the full build; CI does exactly this | Anyone (and any scheduler) reproduces the build with zero local setup |
 
@@ -176,6 +208,14 @@ them, which is why they are not asserted byte-for-byte the way the other
 generated artefacts in this portfolio are — a timing that reproduced exactly
 would mean it was not measured.
 
+The governance step uses those same dbt artifacts as a release gate rather than
+as documentation alone. A committed compact baseline stores model checksums;
+the current manifest supplies the actual dependency graph; and a mutation test
+proves a changed upstream node marks its downstream consumer as impacted. The
+latest outputs include 15 model-run lineage events in an explicitly labelled
+OpenLineage-compatible shape—not a claim that a production lineage backend is
+deployed.
+
 ## Orchestration (Airflow)
 
 [`orchestration/airflow/supply_chain_dbt_dag.py`](orchestration/airflow/supply_chain_dbt_dag.py)
@@ -200,6 +240,9 @@ models/marts/         star schema: dims + facts + kpi_daily rollup
 macros/               expiry_band() — FEFO risk banding, DRY across models
 tests/                singular tests: control totals + OTIF definition
 exports/              the project's own metadata as CSV — models, tests, lineage
+governance/           state baseline, impact engine and release-gate tests
+output/               integrity-hashed packet, memo, impact CSV and run lineage
+docs/                  insights, lineage visual and release operations runbook
 orchestration/airflow/  nightly DAG + DagBag integrity tests (run in CI)
 profiles.yml          duckdb (default) + snowflake targets
 .github/workflows/    CI: full dbt build on DuckDB + Airflow DAG validation

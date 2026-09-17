@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dbt
-        run: pip install dbt-duckdb
+        run: pip install dbt-duckdb pytest
 
       - name: dbt deps
         run: dbt deps --profiles-dir .
@@ -35,7 +35,7 @@ jobs:
       #
       # The badge number is cut out with sed rather than grepped for digits:
       # a shields URL contains %20 for every space, so a digit-run match reads
-      # "154" as 20, 154, 20 and compares the wrong one.
+      # "157" as 20, 157, 20 and compares the wrong one.
       - name: The README test badge must match what dbt parses
         run: |
           data=$(dbt ls --profiles-dir . --resource-type test | grep -c 'supply_chain_analytics')
@@ -57,6 +57,12 @@ jobs:
         # byte-for-byte would mean it was not measured. What this asserts is
         # that the exporter still runs against the manifest dbt produces today.
         run: python exports/build_dbt_metadata.py
+
+      - name: Prove deterministic change impact
+        run: pytest governance/test_release_evidence.py -q
+
+      - name: Gate the analytics release and emit audit evidence
+        run: python governance/build_release_evidence.py
 
   airflow-dag-integrity:
     runs-on: ubuntu-latest

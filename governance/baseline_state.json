@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Committed comparison state for deterministic change-impact analysis",
+  "nodes": {
+    "model.supply_chain_analytics.dim_customer": {
+      "name": "dim_customer",
+      "resource_type": "model",
+      "checksum": "3ac45f3d3b860558b93221baa7b24494c9274ab167e7a54b190981db6acf8aed",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_customers"
+      ]
+    },
+    "model.supply_chain_analytics.dim_lot": {
+      "name": "dim_lot",
+      "resource_type": "model",
+      "checksum": "e1ff79f157e284cc7e6fff6dae03dd1a17eea2c765babe330ced415c7f9abe78",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_lots",
+        "model.supply_chain_analytics.stg_suppliers"
+      ]
+    },
+    "model.supply_chain_analytics.dim_product": {
+      "name": "dim_product",
+      "resource_type": "model",
+      "checksum": "6aea18eb441f16147e6def761a746f338330a43c2d6a346ee98b8f0bea452516",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_products"
+      ]
+    },
+    "model.supply_chain_analytics.dim_warehouse": {
+      "name": "dim_warehouse",
+      "resource_type": "model",
+      "checksum": "05d088960800b85202106cc13734e9df183cb8797e4e8f3a07f8f433a46bffde",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_warehouses"
+      ]
+    },
+    "model.supply_chain_analytics.fct_inventory": {
+      "name": "fct_inventory",
+      "resource_type": "model",
+      "checksum": "9312190f79b494bf8372f6b2c58ee52d67567b82a5cbffb68704800b7f050e8e",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_inventory",
+        "model.supply_chain_analytics.stg_lots",
+        "model.supply_chain_analytics.stg_products"
+      ]
+    },
+    "model.supply_chain_analytics.fct_orders": {
+      "name": "fct_orders",
+      "resource_type": "model",
+      "checksum": "c75a79857ea8d36ec7924996784ab0afd61c7a0a9366b7fb0add1449f0b40b8e",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_orders"
+      ]
+    },
+    "model.supply_chain_analytics.kpi_daily": {
+      "name": "kpi_daily",
+      "resource_type": "model",
+      "checksum": "62f132aca6652e70fa5810adaf5ffd694f273c95c75967a1f853e0e09d6eb5b8",
+      "depends_on": [
+        "model.supply_chain_analytics.fct_orders"
+      ]
+    },
+    "model.supply_chain_analytics.metricflow_time_spine": {
+      "name": "metricflow_time_spine",
+      "resource_type": "model",
+      "checksum": "0a98affc2162dcea092d31f2a2120edc8f24352299843af9de95ca6c48c8ad5f",
+      "depends_on": []
+    },
+    "model.supply_chain_analytics.stg_customers": {
+      "name": "stg_customers",
+      "resource_type": "model",
+      "checksum": "22bcb5bc4114305648497e4dfc1462f85511a86571871dc9b2fbef6e7c8427c8",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_dim_customer"
+      ]
+    },
+    "model.supply_chain_analytics.stg_inventory": {
+      "name": "stg_inventory",
+      "resource_type": "model",
+      "checksum": "073959e8fcec9c327d61b7b6da738d77e9e2079c9f939c135afd0a8c11334d2b",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_fact_inventory_snapshot"
+      ]
+    },
+    "model.supply_chain_analytics.stg_lots": {
+      "name": "stg_lots",
+      "resource_type": "model",
+      "checksum": "8beceae97e7448da4fd93aa20f82ead9c7f17da1cd9b3ccfacd5e34ff8178e16",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_dim_lot"
+      ]
+    },
+    "model.supply_chain_analytics.stg_orders": {
+      "name": "stg_orders",
+      "resource_type": "model",
+      "checksum": "8e0402c693c185daeb829d1b64d814b65ce44d7fec7a19f0a27c638a15541bcc",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_fact_orders"
+      ]
+    },
+    "model.supply_chain_analytics.stg_products": {
+      "name": "stg_products",
+      "resource_type": "model",
+      "checksum": "a419b6af89eab4229b7dcc84f497371e07acb85f26886170ee84d67190f7e095",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_dim_product"
+      ]
+    },
+    "model.supply_chain_analytics.stg_suppliers": {
+      "name": "stg_suppliers",
+      "resource_type": "model",
+      "checksum": "a5496edcb54cfd9016fb5831bd87fa9bcfd086b429ff436b2c8c1d194528e3bd",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_dim_supplier"
+      ]
+    },
+    "model.supply_chain_analytics.stg_warehouses": {
+      "name": "stg_warehouses",
+      "resource_type": "model",
+      "checksum": "c3337254b818c6ca439c87659a06bb8bcb82a539a65e6bdc272b4e192d1efdfd",
+      "depends_on": [
+        "seed.supply_chain_analytics.raw_dim_warehouse"
+      ]
+    },
+    "seed.supply_chain_analytics.raw_dim_customer": {
+      "name": "raw_dim_customer",
+      "resource_type": "seed",
+      "checksum": "6d0c47b98b9b2d9f20b50fb38a5badf1913e40cbebe5d87a449ced89028c91ae",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_dim_lot": {
+      "name": "raw_dim_lot",
+      "resource_type": "seed",
+      "checksum": "ce35d1d8f3875f029ed5346cb1ea650f70b656b76663e2dca04bab717a49320b",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_dim_product": {
+      "name": "raw_dim_product",
+      "resource_type": "seed",
+      "checksum": "cfeed732b53e70d177960bf61fe88d0369b8b5fc71414bb6d752381f69c9ccbc",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_dim_supplier": {
+      "name": "raw_dim_supplier",
+      "resource_type": "seed",
+      "checksum": "5d0bf85ffa01a984148b0dd54c39825c79d615251bc7693f46c2987e9c7b7ff8",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_dim_warehouse": {
+      "name": "raw_dim_warehouse",
+      "resource_type": "seed",
+      "checksum": "a9486e62d655f57f1bfb71ac53e452085ae50a966d528ad82bea472d9a8f1ae0",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_fact_inventory_snapshot": {
+      "name": "raw_fact_inventory_snapshot",
+      "resource_type": "seed",
+      "checksum": "31173c77e70a1fd80edb19c095a77116c0bd1ed56c7427ce160a1305fc47840b",
+      "depends_on": []
+    },
+    "seed.supply_chain_analytics.raw_fact_orders": {
+      "name": "raw_fact_orders",
+      "resource_type": "seed",
+      "checksum": "seeds\\raw_fact_orders.csv",
+      "depends_on": []
+    },
+    "snapshot.supply_chain_analytics.product_price_snapshot": {
+      "name": "product_price_snapshot",
+      "resource_type": "snapshot",
+      "checksum": "55834d00b24cb3560e86e7b3384d6a9e8c5e94b26e37bc17ff63346cafa9dfd8",
+      "depends_on": [
+        "model.supply_chain_analytics.stg_products"
+      ]
+    }
+  }
+}

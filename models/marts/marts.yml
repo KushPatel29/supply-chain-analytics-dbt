@@ -164,25 +164,37 @@ models:
 
   - name: kpi_daily
     description: Daily rollup — the grain an executive trend page reads.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: order_date
+        data_type: date
         tests: [unique, not_null]
       - name: orders
+        data_type: bigint
         tests:
           - not_null
-          - dbt_utils.accepted_range: {min_value: 1, inclusive: true}
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1, inclusive: true}
       - name: revenue
+        data_type: double
         tests: [not_null]
       - name: gross_margin
+        data_type: double
         tests: [not_null]
       - name: otif_rate
+        data_type: double
         tests:
           - not_null
-          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 1, inclusive: true}
       - name: avg_fill_rate
+        data_type: double
         tests:
           - not_null
-          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0, max_value: 1, inclusive: true}
 
 exposures:
   - name: supply_chain_control_tower_report

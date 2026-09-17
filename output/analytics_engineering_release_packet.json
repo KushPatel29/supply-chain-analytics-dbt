@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-09-17T05:05:17.292574+00:00",
+  "decision": "APPROVE",
+  "scope": "Local DuckDB analytics build and committed synthetic dataset",
+  "boundaries": [
+    "Snowflake target is configured but not executed in CI.",
+    "Airflow DAG is imported and structurally tested in CI, not scheduled here.",
+    "Lineage events are OpenLineage-compatible evidence, not a deployed backend integration.",
+    "Business data is synthetic and fixed-seed; findings demonstrate method, not live operations."
+  ],
+  "gates": [
+    {
+      "gate": "dbt execution",
+      "passed": true,
+      "evidence": {
+        "no-op": 1,
+        "pass": 157,
+        "success": 23
+      }
+    },
+    {
+      "gate": "enforced KPI contract",
+      "passed": true,
+      "evidence": "model.supply_chain_analytics.kpi_daily"
+    },
+    {
+      "gate": "semantic revenue reconciliation",
+      "passed": true,
+      "evidence": {
+        "semantic_total_revenue": 56773043.17,
+        "kpi_total_revenue": 56773043.17,
+        "semantic_total_gross_margin": 13378316.75,
+        "kpi_total_gross_margin": 13378316.75,
+        "semantic_otif_rate": 0.80415,
+        "weighted_kpi_otif_rate": 0.804154,
+        "revenue_delta": 0.0,
+        "gross_margin_delta": 0.0,
+        "otif_delta": 4e-06
+      }
+    },
+    {
+      "gate": "semantic OTIF reconciliation",
+      "passed": true,
+      "evidence": {
+        "semantic_total_revenue": 56773043.17,
+        "kpi_total_revenue": 56773043.17,
+        "semantic_total_gross_margin": 13378316.75,
+        "kpi_total_gross_margin": 13378316.75,
+        "semantic_otif_rate": 0.80415,
+        "weighted_kpi_otif_rate": 0.804154,
+        "revenue_delta": 0.0,
+        "gross_margin_delta": 0.0,
+        "otif_delta": 4e-06
+      }
+    },
+    {
+      "gate": "discoverability",
+      "passed": true,
+      "evidence": {
+        "metrics": [
+          "order_count_total",
+          "otif_orders_count",
+          "otif_rate",
+          "total_gross_margin",
+          "total_revenue"
+        ],
+        "semantic_models": [
+          "orders"
+        ],
+        "exposures": [
+          "supply_chain_control_tower_report"
+        ]
+      }
+    }
+  ],
+  "warehouse": {
+    "declared_static_dataset_window": {
+      "orders_min": "2025-01-01",
+      "orders_max": "2025-06-30",
+      "inventory_min": "2025-01-01",
+      "inventory_max": "2025-06-25",
+      "interpretation": "Synthetic, fixed-seed portfolio data; freshness is assessed against this declared window, not wall-clock time."
+    },
+    "order_rows": 20000,
+    "inventory_rows": 7012,
+    "reconciliation": {
+      "semantic_total_revenue": 56773043.17,
+      "kpi_total_revenue": 56773043.17,
+      "semantic_total_gross_margin": 13378316.75,
+      "kpi_total_gross_margin": 13378316.75,
+      "semantic_otif_rate": 0.80415,
+      "weighted_kpi_otif_rate": 0.804154,
+      "revenue_delta": 0.0,
+      "gross_margin_delta": 0.0,
+      "otif_delta": 4e-06
+    }
+  },
+  "change_control": {
+    "changed_nodes": 0,
+    "impacted_downstream_nodes": 0,
+    "evidence_command": "python governance/build_release_evidence.py"
+  },
+  "semantic_layer": {
+    "metrics": [
+      "order_count_total",
+      "otif_orders_count",
+      "otif_rate",
+      "total_gross_margin",
+      "total_revenue"
+    ],
+    "semantic_models": [
+      "orders"
+    ],
+    "exposures": [
+      "supply_chain_control_tower_report"
+    ]
+  },
+  "lineage_event_count": 15,
+  "packet_sha256": "cb3227ca09caea254eb2a4659d8b30dfc8784618973e1ab8ea2fb87bcdad08c7"
+}
