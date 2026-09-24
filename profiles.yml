@@ -1,6 +1,12 @@
 # Self-contained profile: `dbt build --profiles-dir .`
 # Default target runs locally on DuckDB (zero setup).
-# The snowflake target is production-shaped: switch with
+# The databricks target has been run for real on Databricks Free Edition
+# (serverless SQL warehouse, Unity Catalog). It signs in with OAuth in the
+# browser, so no token lives in this file or in the environment:
+#   export DATABRICKS_HOST=dbc-xxxx.cloud.databricks.com
+#   export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<id>
+#   dbt build --profiles-dir . --target databricks
+# The snowflake target is production-shaped but has never been run: switch with
 #   dbt build --profiles-dir . --target snowflake
 # after exporting SNOWFLAKE_ACCOUNT / _USER / _PASSWORD.
 supply_chain_analytics:
@@ -9,6 +15,14 @@ supply_chain_analytics:
     duckdb:
       type: duckdb
       path: target/supply_chain.duckdb
+      threads: 4
+    databricks:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST', '') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH', '') }}"
+      catalog: "{{ env_var('DATABRICKS_CATALOG', 'workspace') }}"
+      schema: supply_chain
+      auth_type: oauth
       threads: 4
     snowflake:
       type: snowflake

@@ -59,7 +59,7 @@ jobs:
         run: python exports/build_dbt_metadata.py
 
       - name: Prove deterministic change impact
-        run: pytest governance/test_release_evidence.py -q
+        run: pytest governance/test_release_evidence.py governance/test_databricks_evidence.py -q
 
       - name: Gate the analytics release and emit audit evidence
         run: python governance/build_release_evidence.py

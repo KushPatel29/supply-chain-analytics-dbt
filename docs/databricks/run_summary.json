@@ -1,0 +1,19 @@
+{
+  "engine": "Databricks Free Edition, serverless SQL warehouse, Unity Catalog catalog `workspace`, schema `supply_chain`, Delta tables",
+  "dbt_version": "1.11.8",
+  "adapter": "dbt-databricks 1.11.8",
+  "command": "dbt build --profiles-dir . --target databricks --full-refresh",
+  "generated_at": "2026-09-24T07:30:39.828845Z",
+  "elapsed_seconds": 154.6,
+  "nodes": {
+    "exposure:no-op": 1,
+    "model:success": 15,
+    "seed:success": 7,
+    "snapshot:success": 1,
+    "test:pass": 151,
+    "unit_test:pass": 6
+  },
+  "failures": [],
+  "incremental_rerun": "dbt run --select fct_orders: OK (delete+insert on Delta)",
+  "reconciliation": "docs/databricks/reconciliation.csv"
+}

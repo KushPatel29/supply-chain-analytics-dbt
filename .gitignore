@@ -3,3 +3,4 @@ dbt_packages/
 logs/
 __pycache__/
 *.duckdb
+target_databricks/

@@ -5,7 +5,8 @@
 [![CI](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml/badge.svg)](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml)
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
-![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20CI--run-29B5E8?logo=snowflake&logoColor=white)
+![Databricks](https://img.shields.io/badge/Databricks-built%20%26%20reconciled%20on%20Free%20Edition-FF3621?logo=databricks&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20run-29B5E8?logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-DAG%20validated%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/dbt%20tests-157%20across%2015%20models-3B8C6E)
 ![Release](https://img.shields.io/badge/release%20packet-APPROVE-167D5A)
@@ -33,21 +34,55 @@ packet plus model-level run-lineage evidence.
 | Governed catalog | 5 MetricFlow metrics + 1 downstream Power BI exposure |
 | Run lineage | 15 model-level events with inputs, output and execution status |
 | Change safety | checksum baseline + tested downstream graph traversal |
+| Second engine | **Databricks**: 180/180 nodes green on a serverless SQL warehouse; 41 of 41 mart totals equal DuckDB's |
 
 Review the [release memo](output/analytics_engineering_release_memo.md),
 [machine-readable packet](output/analytics_engineering_release_packet.json),
 [change-impact inventory](output/change_impact.csv), and
 [operator runbook](docs/RELEASE_OPERATIONS.md). The packet states the evidence
-boundary plainly: DuckDB is executed; the Snowflake target is not. Airflow is
+boundary plainly: DuckDB is executed in CI, Databricks was executed and
+reconciled by hand (below), and the Snowflake target has never run. Airflow is
 imported and structurally tested; it is not scheduled from this portfolio.
 
-Runs locally on **DuckDB with zero setup** (`dbt build`, done) and carries a
-production-shaped **Snowflake** target in the same profile. The SQL is written
-cross-database (dbt dispatch macros), so switching warehouses is a CLI flag
-rather than a rewrite — but read that as a design property, not a demonstrated
-one: **CI only ever builds the DuckDB target.** I do not have a Snowflake
-account to point it at, so the second target is provided and unexercised, and
-saying so is cheaper than letting a badge imply a nightly production run.
+Runs locally on **DuckDB with zero setup** (`dbt build`, done), and the same
+project, unchanged but for one cast, builds on **Databricks**.
+
+## The same project on Databricks
+
+I ran it on Databricks Free Edition: a serverless SQL warehouse, Unity Catalog
+catalog `workspace`, schema `supply_chain`, Delta tables. `dbt build --target
+databricks` loads the 7 seeds, builds the 15 models and the SCD2 snapshot, and
+runs all 157 tests: **180 of 180 nodes green**
+([run summary](docs/databricks/run_summary.json)). A second `dbt run` of the
+incremental `fct_orders` runs the same `delete+insert` strategy it uses on
+DuckDB, now against a Delta table.
+
+Green on both engines says the tests pass on both. It does not say the engines
+agree, so [`governance/reconcile_databricks.py`](governance/reconcile_databricks.py)
+checks that directly: for every mart it compares the row count and the sum of
+every numeric column between the two builds. **41 of 41 measures across 7 marts
+match** ([reconciliation.csv](docs/databricks/reconciliation.csv)).
+
+Porting took one change, and it was a real finding. **The contract caught a
+type drift.** `kpi_daily.otif_rate` is contracted as `double`. On DuckDB
+`sum(int) * 1.0 / count(*)` is a double; on Spark SQL the `1.0` literal is a
+decimal, so the same expression returns a `decimal` and the enforced contract
+refused to build the model. An explicit `cast(… as double)` gives the same
+value on both engines. Without the contract, Power BI would have received a
+decimal column from one engine and a float from the other, and nothing would
+have failed.
+
+The [hosted dbt docs](https://kushpatel29.github.io/dbt-docs/) are generated
+from the Databricks build, so the catalog shows the Delta tables as they
+exist in the workspace. The profile signs in with OAuth in the browser, so no
+token is stored anywhere. That is also why CI does not run this target: an
+unattended job would need a stored service credential, and the free workspace
+is not worth one. CI builds DuckDB weekly. The Databricks run is a dated,
+recorded run, not a nightly one.
+
+A production-shaped **Snowflake** target is also in the profile. I do not have
+a Snowflake account, so it has never run, and saying so is cheaper than letting
+a badge imply it has.
 
 ## What the 157 tests actually check
 
@@ -146,6 +181,16 @@ dbt deps  --profiles-dir .
 dbt build --profiles-dir .          # seed + run + test: 157 tests, all gating
 python governance/build_release_evidence.py  # APPROVE or fail closed
 dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .
+```
+
+### Run it on Databricks
+
+```bash
+pip install dbt-databricks
+export DATABRICKS_HOST=dbc-xxxx.cloud.databricks.com
+export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<warehouse-id>
+dbt build --profiles-dir . --target databricks   # opens a browser to sign in
+DATABRICKS_WAREHOUSE_ID=<warehouse-id> python governance/reconcile_databricks.py
 ```
 
 ### Run it on Snowflake
@@ -248,6 +293,6 @@ governance/           state baseline, impact engine and release-gate tests
 output/               integrity-hashed packet, memo, impact CSV and run lineage
 docs/                  insights, lineage visual and release operations runbook
 orchestration/airflow/  nightly DAG + DagBag integrity tests (run in CI)
-profiles.yml          duckdb (default) + snowflake targets
+profiles.yml          duckdb (default), databricks (run) and snowflake targets
 .github/workflows/    CI: full dbt build on DuckDB + Airflow DAG validation
 ```

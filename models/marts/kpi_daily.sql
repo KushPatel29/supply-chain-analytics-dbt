@@ -8,7 +8,7 @@ select
     count(*)                                      as orders,
     sum(revenue)                                  as revenue,
     sum(gross_margin)                             as gross_margin,
-    round(sum(otif_flag) * 1.0 / count(*), 4)     as otif_rate,
+    round(cast(sum(otif_flag) as double) / count(*), 4) as otif_rate,
     round(avg(fill_rate), 4)                      as avg_fill_rate
 from orders
 group by order_date
