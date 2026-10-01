@@ -11,7 +11,7 @@ on:
 
 jobs:
   dbt-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -65,7 +65,7 @@ jobs:
         run: python governance/build_release_evidence.py
 
   airflow-dag-integrity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +83,7 @@ jobs:
         run: pytest orchestration/airflow/test_dag_integrity.py orchestration/airflow/test_orchestration_claims.py -v
 
   docker-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
