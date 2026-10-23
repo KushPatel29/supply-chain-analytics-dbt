@@ -85,6 +85,12 @@ recorded run, not a nightly one.
 
 ## The same project on Snowflake
 
+The orders seed also ran through **S3 → AWS Glue Data Catalog → Athena** on a
+personal free-plan account: 20,000 rows, 32 of 32 warehouse measures equal to
+independent Python arithmetic, 1.43 MB scanned under a 10 MiB cutoff.
+[Source, query receipt and boundaries](cloud/aws/README.md). This is a small
+dated execution, not AWS production experience.
+
 Then I ran it inside Snowflake with **dbt Projects on Snowflake**, on a trial
 account: a Git repository object reads this repo, `CREATE DBT PROJECT` deploys
 it, and `EXECUTE DBT PROJECT` runs `dbt build --target snowflake` on an X-Small

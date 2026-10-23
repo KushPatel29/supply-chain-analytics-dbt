@@ -1,5 +1,7 @@
 """Hand-calculated money boundaries for the independent Athena judge."""
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,3 +22,12 @@ def test_source_is_pinned_and_within_the_execution_budget():
     assert len(demo.SOURCE_COMMIT) == 40
     assert len(data) <= demo.MAX_SOURCE_BYTES < demo.SCAN_LIMIT
     assert sum(row["lines"] for row in demo.expected_totals(data)) == 20000
+
+def test_recorded_athena_results_equal_independent_seed_arithmetic():
+    receipt = json.loads((ROOT / "cloud/aws/run_receipt.json").read_text())
+    data = (ROOT / "seeds/raw_fact_orders.csv").read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(data).hexdigest() == receipt["source_sha256"]
+    assert receipt["query_state"] == "SUCCEEDED"
+    assert receipt["reconciliation"]["actual"] == demo.expected_totals(data)
+    assert receipt["bytes_scanned"] == len(data) < receipt["scan_cutoff_bytes"]
+    assert all(receipt["s3_block_public_access"].values())
