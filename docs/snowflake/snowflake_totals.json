@@ -1,0 +1,214 @@
+{
+  "query_id": "01c7ea2c-000e-1b1f-0000-0002c8928f89",
+  "run_at": "2026-10-23T04:28:31+00:00",
+  "query": "python governance/reconcile_snowflake.py sql",
+  "schema": "SUPPLY_CHAIN.ANALYTICS",
+  "note": "Returned by the query above in Snowsight, after the dbt build and the incremental rerun of fct_orders. Copied verbatim; compare with `python governance/reconcile_snowflake.py compare docs/snowflake/snowflake_totals.json`.",
+  "totals": [
+    {
+      "mart": "dim_customer",
+      "measure": "customer_id",
+      "value": "820"
+    },
+    {
+      "mart": "dim_customer",
+      "measure": "row_count",
+      "value": "40"
+    },
+    {
+      "mart": "dim_lot",
+      "measure": "lot_id",
+      "value": "4501500"
+    },
+    {
+      "mart": "dim_lot",
+      "measure": "product_id",
+      "value": "92177"
+    },
+    {
+      "mart": "dim_lot",
+      "measure": "row_count",
+      "value": "3000"
+    },
+    {
+      "mart": "dim_lot",
+      "measure": "supplier_id",
+      "value": "24167"
+    },
+    {
+      "mart": "dim_product",
+      "measure": "product_id",
+      "value": "1830"
+    },
+    {
+      "mart": "dim_product",
+      "measure": "row_count",
+      "value": "60"
+    },
+    {
+      "mart": "dim_product",
+      "measure": "shelf_life_days",
+      "value": "3244"
+    },
+    {
+      "mart": "dim_product",
+      "measure": "unit_cost",
+      "value": "1287.5"
+    },
+    {
+      "mart": "dim_product",
+      "measure": "unit_price",
+      "value": "1683.4"
+    },
+    {
+      "mart": "dim_warehouse",
+      "measure": "row_count",
+      "value": "8"
+    },
+    {
+      "mart": "dim_warehouse",
+      "measure": "warehouse_id",
+      "value": "36"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "days_until_expiry",
+      "value": "858654"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "inventory_value",
+      "value": "34564501.89"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "lot_id",
+      "value": "10490376"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "product_id",
+      "value": "220419"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "qty_on_hand",
+      "value": "1519001.7"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "row_count",
+      "value": "7012"
+    },
+    {
+      "mart": "fct_inventory",
+      "measure": "warehouse_id",
+      "value": "31951"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "cogs",
+      "value": "43394725.92"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "customer_id",
+      "value": "411762"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "fill_rate",
+      "value": "19758.1009"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "gross_margin",
+      "value": "13378316.75"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "lot_id",
+      "value": "30121886"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "order_id",
+      "value": "200010000"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "otif_flag",
+      "value": "16083"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "product_id",
+      "value": "611553"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "qty_ordered",
+      "value": "2040265"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "qty_shipped",
+      "value": "2015397.2"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "revenue",
+      "value": "56773043.17"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "row_count",
+      "value": "20000"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "unit_cost",
+      "value": "429913.92"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "unit_price",
+      "value": "562541.06"
+    },
+    {
+      "mart": "fct_orders",
+      "measure": "warehouse_id",
+      "value": "90334"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "avg_fill_rate",
+      "value": "178.8074"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "gross_margin",
+      "value": "13378316.75"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "orders",
+      "value": "20000"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "otif_rate",
+      "value": "145.5864"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "revenue",
+      "value": "56773043.17"
+    },
+    {
+      "mart": "kpi_daily",
+      "measure": "row_count",
+      "value": "181"
+    }
+  ]
+}

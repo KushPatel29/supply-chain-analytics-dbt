@@ -1,0 +1,376 @@
+# Supply Chain Analytics — dbt
+
+### *The same star schema as my Fabric repo, rebuilt the analytics-engineering way — and then actually interrogated, because a mart nobody questions is furniture.*
+
+[![CI](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml/badge.svg)](https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/workflows/ci.yml)
+![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
+![Databricks](https://img.shields.io/badge/Databricks-built%20%26%20reconciled%20on%20Free%20Edition-FF3621?logo=databricks&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-built%20%26%20reconciled%20with%20dbt%20Projects%20on%20Snowflake-29B5E8?logo=snowflake&logoColor=white)
+![Airflow](https://img.shields.io/badge/Airflow-scheduler%20runs%20it%20nightly%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
+![Tests](https://img.shields.io/badge/dbt%20tests-157%20across%2015%20models-3B8C6E)
+![Release](https://img.shields.io/badge/release%20packet-APPROVE-167D5A)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+
+The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-control-tower)
+star schema, rebuilt the analytics-engineering way: dbt seeds → staging views
+→ dimensional marts, with tests as the deployment gate, generated docs and
+lineage, an exposure declaring the downstream Power BI report, and a
+production-shaped Airflow DAG that a real Airflow scheduler runs nightly in CI.
+
+It now also behaves like a releasable data product. The executive KPI mart has
+an **enforced contract**; governed revenue and OTIF definitions reconcile to
+their physical marts; a deterministic state comparison identifies changed
+nodes and downstream impact; and every build emits a SHA-256 integrity-hashed release
+packet plus model-level run-lineage evidence.
+
+## Release control room
+
+| Decision evidence | Latest result |
+|---|---|
+| Release gate | **APPROVE** — all five executable gates passed |
+| Contract | `kpi_daily` column names and types enforced at materialization |
+| Semantic reconciliation | **$0.00 revenue delta**; **0.000004 OTIF delta** |
+| Governed catalog | 5 MetricFlow metrics + 1 downstream Power BI exposure |
+| Run lineage | 15 model-level events with inputs, output and execution status |
+| Change safety | checksum baseline + tested downstream graph traversal |
+| Second engine | **Databricks**: 180/180 nodes green on a serverless SQL warehouse; 41 of 41 mart totals equal DuckDB's |
+| Third engine | **Snowflake**: 180/180 nodes green with dbt Projects on Snowflake; 41 of 41 mart totals equal DuckDB's; no model SQL changed |
+
+Review the [release memo](output/analytics_engineering_release_memo.md),
+[machine-readable packet](output/analytics_engineering_release_packet.json),
+[change-impact inventory](output/change_impact.csv), and
+[operator runbook](docs/RELEASE_OPERATIONS.md). The packet states the evidence
+boundary plainly: DuckDB is executed in CI; Databricks and Snowflake were
+executed and reconciled by hand on dated runs (below), not on a schedule. The
+Airflow DAG runs nightly in CI under Airflow's own scheduler on a throwaway runner:
+a real run, not a production deployment.
+
+Runs locally on **DuckDB with zero setup** (`dbt build`, done), and the same
+project, unchanged but for one cast, builds on **Databricks** and on
+**Snowflake**.
+
+## The same project on Databricks
+
+I ran it on Databricks Free Edition: a serverless SQL warehouse, Unity Catalog
+catalog `workspace`, schema `supply_chain`, Delta tables. `dbt build --target
+databricks` loads the 7 seeds, builds the 15 models and the SCD2 snapshot, and
+runs all 157 tests: **180 of 180 nodes green**
+([run summary](docs/databricks/run_summary.json)). A second `dbt run` of the
+incremental `fct_orders` runs the same `delete+insert` strategy it uses on
+DuckDB, now against a Delta table.
+
+Green on both engines says the tests pass on both. It does not say the engines
+agree, so [`governance/reconcile_databricks.py`](governance/reconcile_databricks.py)
+checks that directly: for every mart it compares the row count and the sum of
+every numeric column between the two builds. **41 of 41 measures across 7 marts
+match** ([reconciliation.csv](docs/databricks/reconciliation.csv)).
+
+Porting took one change, and it was a real finding. **The contract caught a
+type drift.** `kpi_daily.otif_rate` is contracted as `double`. On DuckDB
+`sum(int) * 1.0 / count(*)` is a double; on Spark SQL the `1.0` literal is a
+decimal, so the same expression returns a `decimal` and the enforced contract
+refused to build the model. An explicit `cast(… as double)` gives the same
+value on both engines. Without the contract, Power BI would have received a
+decimal column from one engine and a float from the other, and nothing would
+have failed.
+
+The [hosted dbt docs](https://kushpatel29.github.io/dbt-docs/) are generated
+from the Databricks build, so the catalog shows the Delta tables as they
+exist in the workspace. The profile signs in with OAuth in the browser, so no
+token is stored anywhere. That is also why CI does not run this target: an
+unattended job would need a stored service credential, and the free workspace
+is not worth one. CI builds DuckDB weekly. The Databricks run is a dated,
+recorded run, not a nightly one.
+
+## The same project on Snowflake
+
+The orders seed also ran through **S3 → AWS Glue Data Catalog → Athena** on a
+personal free-plan account: 20,000 rows, 32 of 32 warehouse measures equal to
+independent Python arithmetic, 1.43 MB scanned under a 10 MiB cutoff.
+[Source, query receipt and boundaries](cloud/aws/README.md). This is a small
+dated execution, not AWS production experience.
+
+Then I ran it inside Snowflake with **dbt Projects on Snowflake**, on a trial
+account: a Git repository object reads this repo, `CREATE DBT PROJECT` deploys
+it, and `EXECUTE DBT PROJECT` runs `dbt build --target snowflake` on an X-Small
+warehouse. Seeds, the 15 models, the SCD2 snapshot and all 157 tests:
+**180 of 180 nodes green on Snowflake** in 61 seconds
+([run summary](docs/snowflake/run_summary.json)). A second run of the
+incremental `fct_orders` did its `delete+insert` over the 7-day window
+(785 rows) on a Snowflake table.
+
+Snowflake needed no model change: the one cast that Databricks forced was
+already the portable spelling, and the enforced contract on `kpi_daily` held
+on a third type system. The totals are held to DuckDB the same way, with
+[`governance/reconcile_snowflake.py`](governance/reconcile_snowflake.py): it
+writes the query, I ran it in Snowsight, and the result is committed with its
+query ID ([snowflake_totals.json](docs/snowflake/snowflake_totals.json)).
+**41 of 41 Snowflake measures across 7 marts match**
+([reconciliation.csv](docs/snowflake/reconciliation.csv)); the largest
+difference is DuckDB's floating-point sum of revenue, 1e-7 of a dollar.
+
+Two things a trial account taught me about running dbt inside Snowflake:
+
+- **It cannot reach dbt Hub.** External network access needs an external
+  access integration, so `dbt deps` cannot run there. A
+  [workflow](.github/workflows/snowflake-deploy.yml) installs the packages in
+  CI and publishes master plus `dbt_packages` to a `snowflake-deploy` branch,
+  which is what Snowflake deploys.
+- **The compile on deploy uses the default target.** `CREATE DBT PROJECT`
+  compiles the project immediately, and with no `DEFAULT_TARGET` it picked the
+  profile's default, DuckDB, and failed. `DEFAULT_TARGET = 'snowflake'` fixes
+  it.
+
+The profile's Snowflake target holds no account, user or password: Snowflake
+runs the project as the signed-in user. The whole deployment is one SQL file,
+[docs/snowflake/deploy.sql](docs/snowflake/deploy.sql).
+
+## What the 157 tests actually check
+
+Three kinds, because they fail at different things.
+
+**151 data tests** — the generic and singular ones — describe properties the
+warehouse must have. Keys are unique and present, every foreign key resolves to
+the dimension it names, every number a downstream model multiplies is
+range-bounded, and each fact holds its stated grain. On top of those sit five
+control totals that no single-model test can see: `kpi_daily` recomputed from
+`fct_orders` and required to agree day by day, a set difference in both
+directions between staging and the fact so an incremental `delete+insert` cannot
+quietly drop a line, inventory revalued from the product dimension, the expiry
+bands restated independently of the macro that produced them, an SCD Type 2
+check on the price snapshot for the three ways a snapshot goes wrong — two rows
+open at once, a window that ends before it starts, two windows that overlap.
+Three semantic controls then protect the reporting contract itself: daily fill
+rate is recomputed at order grain, total revenue ties between the governed
+definition and KPI mart, and the overall OTIF ratio is weighted by orders rather
+than calculated as a misleading average of rounded daily percentages.
+
+**6 unit tests** run the model SQL against fixed inputs, which the data tests
+structurally cannot. Nothing above would notice if the OTIF threshold moved from
+0.95 to 0.90: every row would still carry a valid-looking flag. So the boundaries
+are pinned directly — exactly on the promise date, exactly 95% filled, a hair
+under at 0.9499, a full order shipped a day late, an order never shipped, and a
+cancelled line whose zero quantity must not divide by zero. Money is pinned the
+same way, including the case that matters most: a partly shipped line has to be
+priced on what left the warehouse, not on what was asked for.
+
+Each of these was checked by breaking the thing it guards. Moving the OTIF
+threshold, pricing revenue on `qty_ordered`, shifting an expiry band, rounding
+`otif_rate` to two places, valuing inventory at price instead of cost, and
+deleting an order line each fail exactly the test that exists for it, and no
+others.
+
+**One tolerance is derived rather than chosen.** Revenue, COGS and margin are
+each rounded to the cent independently, so `revenue - cogs - gross_margin` can
+legitimately land anywhere within 1.5 cents. Asserted at one cent it failed 288
+of 20,000 rows at a measured maximum of 0.010000000001 — one cent, plus the
+float representation of one cent. The model was right and the bound was a hair
+too tight; the test now carries the arithmetic that justifies its threshold.
+
+## The finding I did not expect
+
+Building the marts is the easy half. The half that matters is asking them
+something, and the first thing I asked came back the opposite of the assumption
+everyone brings to a distribution business:
+
+> **Revenue is not Pareto-concentrated. It takes 31 of 40 customers to reach 80%
+> of revenue.**
+
+There is no whale to protect. That single number changes the operational answer:
+fulfilment improvements have to be **systemic** — warehouse and process level —
+because there is no short list of key accounts whose babysitting would move the
+number. The usual 80/20 play would have been wasted effort here, and the only
+reason I know that is that I checked instead of assuming.
+
+Three more, each with a reproducible query in [`analyses/`](analyses/):
+
+| finding | why it changes the response |
+|---|---|
+| **OTIF averages 80.4%, and its worst day is 72.8%** | The floor triggers retailer chargebacks, not the mean. Averages hide exactly the days that cost money. |
+| **Critical-expiry inventory clusters in one site** — ~$823K at BC Interior DC 5 | A FEFO pick-priority rule at a *single* DC addresses most of the writedown exposure. Cheap fix, because the risk is concentrated. |
+| **Channel margins are flat: 23.5–23.7%** | "Sell more of the profitable channel" is not a lever when the channels earn within 0.2 points of each other. Cost and expiry waste are. |
+
+Full working in [`docs/INSIGHTS.md`](docs/INSIGHTS.md). Every number rebuilds
+from `dbt build`.
+
+## Lineage
+
+**[Browse the dbt docs site](https://kushpatel29.github.io/dbt-docs/)**: every model, column,
+test and exposure, with the interactive lineage graph. It is generated by
+`dbt docs generate --static` after a green `dbt build`, so there is nothing to clone or run.
+
+![dbt lineage graph](docs/lineage.png)
+
+```
+seeds (raw ERP extracts)          staging (typed, renamed)        marts (star schema)
+raw_fact_orders              ->   stg_orders                 ->   fct_orders  ->  kpi_daily
+raw_fact_inventory_snapshot  ->   stg_inventory              ->   fct_inventory
+raw_dim_*                    ->   stg_*                      ->   dim_product / dim_customer /
+                                                                  dim_warehouse / dim_lot
+```
+
+Business logic lives in the marts: OTIF flag (on-time AND fill ≥ 95%),
+revenue/margin, and FEFO expiry banding via the `expiry_band()` macro —
+the same rules the Control Tower's PySpark Silver layer implements, so the
+two repos double as a cross-engine consistency check.
+
+## Run it (60 seconds, no warehouse needed)
+
+```bash
+pip install dbt-duckdb
+dbt deps  --profiles-dir .
+dbt build --profiles-dir .          # seed + run + test: 157 tests, all gating
+python governance/build_release_evidence.py  # APPROVE or fail closed
+dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .
+```
+
+### Run it on Databricks
+
+```bash
+pip install dbt-databricks
+export DATABRICKS_HOST=dbc-xxxx.cloud.databricks.com
+export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<warehouse-id>
+dbt build --profiles-dir . --target databricks   # opens a browser to sign in
+DATABRICKS_WAREHOUSE_ID=<warehouse-id> python governance/reconcile_databricks.py
+```
+
+### Run it on Snowflake
+
+Open [docs/snowflake/deploy.sql](docs/snowflake/deploy.sql) in a Snowsight SQL
+file and run it: one read-only Git integration, a warehouse, the Git repository
+object, `CREATE DBT PROJECT` and `EXECUTE DBT PROJECT`. Then reconcile:
+
+```bash
+python governance/reconcile_snowflake.py sql   # run the printed query in Snowsight
+python governance/reconcile_snowflake.py compare docs/snowflake/snowflake_totals.json
+```
+
+The `profiles.yml` ships both targets. Model SQL uses dbt cross-database
+macros (`dbt.datediff`, `dbt_utils.*`), so no model changes are needed to
+move between engines.
+
+## Testing philosophy
+
+| Layer | What's tested |
+|---|---|
+| Schema tests | `unique` / `not_null` keys on every model, `relationships` from fact to every dimension, `accepted_values` on flags |
+| Expression tests | `qty_shipped <= qty_ordered`, `fill_rate between 0 and 1` (dbt_utils) |
+| Singular tests | **Control total**: mart revenue must tie to revenue recomputed from staging to the penny. **Definition test**: every OTIF-flagged row actually satisfies the OTIF definition. |
+
+`dbt build` won't ship marts whose tests fail — tests are the gate, not a
+report.
+
+## Advanced dbt features in use
+
+| Feature | Where | Why it matters |
+|---|---|---|
+| **Incremental model** | `fct_orders` — `delete+insert` on `order_id` with a 7-day late-arrival reprocess window | The pattern that makes a 100M-row fact affordable: only new/changed days rebuild |
+| **SCD Type 2 snapshot** | `snapshots/product_price_snapshot.sql` (`check` strategy on cost/price) | Repricing history is preserved, so margin can be recomputed as-of any order date |
+| **Semantic layer (MetricFlow)** | `models/semantic/` — entities, measures, and governed metrics (`total_revenue`, `otif_rate` as a ratio metric) + time spine | Metric definitions live in code, not in each BI tool separately |
+| **Enforced data contract** | `kpi_daily` — names and warehouse types checked before replacement | A silent schema drift fails the build before it reaches the executive report |
+| **Release governance** | `governance/` + `output/` — state comparison, fan-out, reconciliations, integrity-hashed packet and run lineage | A reviewer can answer what changed, what it affects and why the build is releasable |
+| **Analyses + findings memo** | `analyses/*.sql` + [`docs/INSIGHTS.md`](docs/INSIGHTS.md) | The "so what": four findings with reproducible numbers, incl. why this data is *not* 80/20 |
+| **Containerized build** | `Dockerfile` — `docker run --rm sca-dbt` executes the full build; CI does exactly this | Anyone (and any scheduler) reproduces the build with zero local setup |
+
+## The project as data
+
+`dbt build` leaves its own account of what it did in `target/manifest.json` and
+`target/run_results.json` — every model, every test, every edge of the graph,
+with build status and timings. That is a warehouse describing itself, and it is
+JSON nobody can query.
+
+[`exports/build_dbt_metadata.py`](exports/build_dbt_metadata.py) flattens it
+into four CSVs so the project can be asked questions the way its own marts can:
+
+| File | One row per | Answers |
+|---|---|---|
+| `models.csv` | model | which layer, which materialization, how many parents, children, tests and columns — and whether it built |
+| `tests.csv` | test | what it asserts, against which model, and whether it passed |
+| `lineage.csv` | edge | what feeds what, so the graph is joinable rather than only drawable |
+| `kpi_daily.csv` | day | the one mart whose grain exists nowhere else in the portfolio |
+
+It deliberately skips the seeds and the passthrough dimensions: those are the
+same rows as the raw ERP extract and are already published by the Control Tower
+repository. Exporting them again would be two copies of one fact, which is the
+thing a warehouse exists to prevent.
+
+CI runs it after `dbt build`, so a change that breaks the exporter fails the
+build rather than being discovered the next time someone opens the folder. The
+committed CSVs carry the build date and per-model timings of the run that wrote
+them, which is why they are not asserted byte-for-byte the way the other
+generated artefacts in this portfolio are — a timing that reproduced exactly
+would mean it was not measured.
+
+The governance step uses those same dbt artifacts as a release gate rather than
+as documentation alone. A committed compact baseline stores model checksums;
+the current manifest supplies the actual dependency graph; and a mutation test
+proves a changed upstream node marks its downstream consumer as impacted. The
+latest outputs include 15 model-run lineage events in an explicitly labelled
+OpenLineage-compatible shape—not a claim that a production lineage backend is
+deployed.
+
+## Orchestration (Airflow)
+
+[`orchestration/airflow/supply_chain_dbt_dag.py`](orchestration/airflow/supply_chain_dbt_dag.py)
+is the nightly production DAG: `dbt deps → seed → run (staging → marts, as a
+TaskGroup) → test`, with retries, an SLA on the marts build, and email on
+failure. On every push CI installs Airflow and **imports the DAG with a DagBag**,
+asserting the task graph, so a broken DAG fails the pull request.
+
+**And it runs.** Every night, and on any change to the DAG or the models,
+[`airflow-run.yml`](.github/workflows/airflow-run.yml) starts an Airflow
+scheduler on a throwaway GitHub runner, unpauses the DAG and lets the scheduler
+create the run from the DAG's own schedule
+([`run_with_scheduler.sh`](orchestration/airflow/run_with_scheduler.sh)); nothing
+triggers it by hand. The job fails unless the scheduler made the run, all six
+tasks succeeded and every mart and the price snapshot hold rows
+([`check_built_marts.py`](orchestration/airflow/check_built_marts.py)). The
+scheduler runs nightly in CI; that is a real Airflow run on CI hardware, not a
+production deployment.
+
+Running it for the first time found two defects that the DagBag checks
+could not:
+
+- **Every task built into a directory that then vanished.** `BashOperator`
+  starts each task in a fresh temporary directory, and the DuckDB profile's
+  relative path went with it, so `dbt_seed` loaded a database the next task
+  never saw. The first run failed at `dbt_seed`; every task now runs in the
+  project directory.
+- **The tests needed a table nothing built.** `dbt build` runs snapshots; a DAG
+  that splits `run` and `test` has to ask for them, and this one did not, so the
+  first run that got that far failed at `dbt_test` on the missing SCD2 price
+  snapshot. A `snapshot_prices` task now runs beside the marts.
+
+The DAG also caps itself at one active run, since two would write the same
+DuckDB file. The first green CI run (23 October 2026,
+[record](orchestration/airflow/first_ci_run.json)): the scheduler created
+`scheduled__2026-10-22T06:00:00+00:00` itself, and all six tasks succeeded in
+36.7 seconds.
+
+## Exposure
+
+The marts declare a dbt **exposure** for the downstream Power BI report
+(`supply_chain_control_tower_report`), so `dbt ls --select +exposure:...`
+answers "what breaks upstream if I change this model?" — the lineage
+question every BI team gets asked.
+
+## Repo layout
+
+```
+seeds/                raw ERP extracts (synthetic, fixed seed, from the Control Tower repo)
+models/staging/       typed/renamed views, 1:1 with sources
+models/marts/         star schema: dims + facts + kpi_daily rollup
+macros/               expiry_band() — FEFO risk banding, DRY across models
+tests/                singular tests: control totals + OTIF definition
+exports/              the project's own metadata as CSV — models, tests, lineage
+governance/           state baseline, impact engine and release-gate tests
+output/               integrity-hashed packet, memo, impact CSV and run lineage
+docs/                  insights, lineage visual and release operations runbook
+docs/databricks/       the recorded Databricks run and its reconciliation
+docs/snowflake/        deploy.sql, the recorded Snowflake run, its query result and reconciliation
+orchestration/airflow/  nightly DAG, DagBag tests, and the scheduler run CI does nightly
+profiles.yml          duckdb (default), databricks (run) and snowflake (run) targets
+.github/workflows/    CI: dbt build on DuckDB, DAG validation, nightly Airflow scheduler run
+                      and the snowflake-deploy branch (master + dbt_packages)
+```

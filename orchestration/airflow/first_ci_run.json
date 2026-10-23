@@ -1,0 +1,11 @@
+{
+  "workflow_run": "https://github.com/KushPatel29/supply-chain-analytics-dbt/actions/runs/40002828039",
+  "commit": "cd1be92",
+  "recorded_from": "the run's annotations (Airflow run, Airflow tasks, Marts built)",
+  "run": {"run_id": "scheduled__2026-10-22T06:00:00+00:00", "created_by": "scheduler", "state": "success",
+          "started": "2026-10-23T18:23:45.911560+00:00", "ended": "2026-10-23T18:24:22.626688+00:00", "seconds": 36.7},
+  "tasks": [["dbt_deps", "success", 2.6], ["dbt_seed", "success", 8.0], ["dbt_run.run_staging", "success", 3.4],
+            ["dbt_run.run_marts", "success", 4.7], ["dbt_run.snapshot_prices", "success", 3.3], ["dbt_test", "success", 6.2]],
+  "marts_rows": {"dim_customer": 40, "dim_lot": 3000, "dim_product": 60, "dim_warehouse": 8, "fct_inventory": 7012,
+                 "fct_orders": 20000, "kpi_daily": 181, "product_price_snapshot": 60}
+}
