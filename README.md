@@ -6,7 +6,7 @@
 ![dbt](https://img.shields.io/badge/dbt-Core%201.11-FF694B?logo=dbt&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Databricks](https://img.shields.io/badge/Databricks-built%20%26%20reconciled%20on%20Free%20Edition-FF3621?logo=databricks&logoColor=white)
-![Snowflake](https://img.shields.io/badge/Snowflake-target%20provided%2C%20not%20run-29B5E8?logo=snowflake&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-built%20%26%20reconciled%20with%20dbt%20Projects%20on%20Snowflake-29B5E8?logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-DAG%20validated%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/dbt%20tests-157%20across%2015%20models-3B8C6E)
 ![Release](https://img.shields.io/badge/release%20packet-APPROVE-167D5A)
@@ -35,17 +35,19 @@ packet plus model-level run-lineage evidence.
 | Run lineage | 15 model-level events with inputs, output and execution status |
 | Change safety | checksum baseline + tested downstream graph traversal |
 | Second engine | **Databricks**: 180/180 nodes green on a serverless SQL warehouse; 41 of 41 mart totals equal DuckDB's |
+| Third engine | **Snowflake**: 180/180 nodes green with dbt Projects on Snowflake; 41 of 41 mart totals equal DuckDB's; no model SQL changed |
 
 Review the [release memo](output/analytics_engineering_release_memo.md),
 [machine-readable packet](output/analytics_engineering_release_packet.json),
 [change-impact inventory](output/change_impact.csv), and
 [operator runbook](docs/RELEASE_OPERATIONS.md). The packet states the evidence
-boundary plainly: DuckDB is executed in CI, Databricks was executed and
-reconciled by hand (below), and the Snowflake target has never run. Airflow is
+boundary plainly: DuckDB is executed in CI; Databricks and Snowflake were
+executed and reconciled by hand on dated runs (below), not on a schedule. Airflow is
 imported and structurally tested; it is not scheduled from this portfolio.
 
 Runs locally on **DuckDB with zero setup** (`dbt build`, done), and the same
-project, unchanged but for one cast, builds on **Databricks**.
+project, unchanged but for one cast, builds on **Databricks** and on
+**Snowflake**.
 
 ## The same project on Databricks
 
@@ -80,9 +82,42 @@ unattended job would need a stored service credential, and the free workspace
 is not worth one. CI builds DuckDB weekly. The Databricks run is a dated,
 recorded run, not a nightly one.
 
-A production-shaped **Snowflake** target is also in the profile. I do not have
-a Snowflake account, so it has never run, and saying so is cheaper than letting
-a badge imply it has.
+## The same project on Snowflake
+
+Then I ran it inside Snowflake with **dbt Projects on Snowflake**, on a trial
+account: a Git repository object reads this repo, `CREATE DBT PROJECT` deploys
+it, and `EXECUTE DBT PROJECT` runs `dbt build --target snowflake` on an X-Small
+warehouse. Seeds, the 15 models, the SCD2 snapshot and all 157 tests:
+**180 of 180 nodes green on Snowflake** in 61 seconds
+([run summary](docs/snowflake/run_summary.json)). A second run of the
+incremental `fct_orders` did its `delete+insert` over the 7-day window
+(785 rows) on a Snowflake table.
+
+Snowflake needed no model change: the one cast that Databricks forced was
+already the portable spelling, and the enforced contract on `kpi_daily` held
+on a third type system. The totals are held to DuckDB the same way, with
+[`governance/reconcile_snowflake.py`](governance/reconcile_snowflake.py): it
+writes the query, I ran it in Snowsight, and the result is committed with its
+query ID ([snowflake_totals.json](docs/snowflake/snowflake_totals.json)).
+**41 of 41 Snowflake measures across 7 marts match**
+([reconciliation.csv](docs/snowflake/reconciliation.csv)); the largest
+difference is DuckDB's floating-point sum of revenue, 1e-7 of a dollar.
+
+Two things a trial account taught me about running dbt inside Snowflake:
+
+- **It cannot reach dbt Hub.** External network access needs an external
+  access integration, so `dbt deps` cannot run there. A
+  [workflow](.github/workflows/snowflake-deploy.yml) installs the packages in
+  CI and publishes master plus `dbt_packages` to a `snowflake-deploy` branch,
+  which is what Snowflake deploys.
+- **The compile on deploy uses the default target.** `CREATE DBT PROJECT`
+  compiles the project immediately, and with no `DEFAULT_TARGET` it picked the
+  profile's default, DuckDB, and failed. `DEFAULT_TARGET = 'snowflake'` fixes
+  it.
+
+The profile's Snowflake target holds no account, user or password: Snowflake
+runs the project as the signed-in user. The whole deployment is one SQL file,
+[docs/snowflake/deploy.sql](docs/snowflake/deploy.sql).
 
 ## What the 157 tests actually check
 
@@ -195,10 +230,13 @@ DATABRICKS_WAREHOUSE_ID=<warehouse-id> python governance/reconcile_databricks.py
 
 ### Run it on Snowflake
 
+Open [docs/snowflake/deploy.sql](docs/snowflake/deploy.sql) in a Snowsight SQL
+file and run it: one read-only Git integration, a warehouse, the Git repository
+object, `CREATE DBT PROJECT` and `EXECUTE DBT PROJECT`. Then reconcile:
+
 ```bash
-pip install dbt-snowflake
-export SNOWFLAKE_ACCOUNT=... SNOWFLAKE_USER=... SNOWFLAKE_PASSWORD=...
-dbt build --profiles-dir . --target snowflake
+python governance/reconcile_snowflake.py sql   # run the printed query in Snowsight
+python governance/reconcile_snowflake.py compare docs/snowflake/snowflake_totals.json
 ```
 
 The `profiles.yml` ships both targets. Model SQL uses dbt cross-database
@@ -292,7 +330,10 @@ exports/              the project's own metadata as CSV — models, tests, linea
 governance/           state baseline, impact engine and release-gate tests
 output/               integrity-hashed packet, memo, impact CSV and run lineage
 docs/                  insights, lineage visual and release operations runbook
+docs/databricks/       the recorded Databricks run and its reconciliation
+docs/snowflake/        deploy.sql, the recorded Snowflake run, its query result and reconciliation
 orchestration/airflow/  nightly DAG + DagBag integrity tests (run in CI)
-profiles.yml          duckdb (default), databricks (run) and snowflake targets
+profiles.yml          duckdb (default), databricks (run) and snowflake (run) targets
 .github/workflows/    CI: full dbt build on DuckDB + Airflow DAG validation
+                      and the snowflake-deploy branch (master + dbt_packages)
 ```

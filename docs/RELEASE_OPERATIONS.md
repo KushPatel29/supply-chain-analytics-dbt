@@ -52,8 +52,10 @@ python governance/build_release_evidence.py --write-baseline
   governed definition ties out.
 - The Airflow DAG is imported and structurally tested in CI. Scheduling,
   credentials, alerts and SLA operations require a real Airflow environment.
-- The Snowflake target is configuration evidence only. Warehouse compatibility
-  remains unproven until a Snowflake build runs.
+- The Snowflake and Databricks targets are proven by dated, recorded runs
+  (docs/snowflake, docs/databricks), each reconciled mart by mart to DuckDB.
+  CI does not rerun them: rerun deploy.sql or the Databricks steps after a
+  model change, then the reconcile script, before trusting those engines again.
 
 ## Evidence inventory
 

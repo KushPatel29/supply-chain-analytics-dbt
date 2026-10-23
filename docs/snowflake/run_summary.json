@@ -1,0 +1,22 @@
+{
+  "engine": "Snowflake trial account (AWS), dbt Projects on Snowflake, X-Small warehouse DBT_WH, database SUPPLY_CHAIN, schema ANALYTICS",
+  "dbt_version": "1.11.11",
+  "adapter": "dbt-snowflake 1.11.5",
+  "deployed_from": "Git repository object on the snowflake-deploy branch (master cea7b1b plus dbt_packages from CI)",
+  "command": "EXECUTE DBT PROJECT SUPPLY_CHAIN.DEPLOY.SUPPLY_CHAIN_ANALYTICS ARGS = 'build --target snowflake --full-refresh'",
+  "query_id": "01c7ea27-000e-1b8c-0000-0002c892e081",
+  "started_at": "2026-10-23T04:23:40Z",
+  "elapsed_seconds": 61.09,
+  "nodes": {
+    "exposure:no-op": 1,
+    "model:success": 15,
+    "seed:success": 7,
+    "snapshot:success": 1,
+    "test:pass": 151,
+    "unit_test:pass": 6
+  },
+  "failures": [],
+  "model_sql_changes_needed": 0,
+  "incremental_rerun": "EXECUTE DBT PROJECT ... ARGS = 'run --select fct_orders --target snowflake': OK, delete+insert of 785 rows over the 7-day window",
+  "reconciliation": "docs/snowflake/reconciliation.csv"
+}

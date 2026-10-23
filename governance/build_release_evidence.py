@@ -1,8 +1,9 @@
 """Build an auditable analytics-engineering release packet from dbt artifacts.
 
-The packet deliberately distinguishes evidence we execute (DuckDB build,
-contracts, reconciliations) from production-shaped examples we only validate
-(the Snowflake profile and Airflow DAG).
+The packet deliberately distinguishes evidence we execute in CI (DuckDB build,
+contracts, reconciliations), evidence recorded from dated runs on other engines
+(Databricks and Snowflake), and production-shaped examples we only validate
+(the Airflow DAG).
 """
 
 from __future__ import annotations
@@ -276,7 +277,7 @@ def build_release_packet() -> dict[str, Any]:
         "decision": "APPROVE" if all(gate["passed"] for gate in gates) else "HOLD",
         "scope": "Local DuckDB analytics build and committed synthetic dataset",
         "boundaries": [
-            "Snowflake target is configured but not executed in CI.",
+            "Databricks and Snowflake builds are dated, recorded runs reconciled to DuckDB, not executed in CI.",
             "Airflow DAG is imported and structurally tested in CI, not scheduled here.",
             "Lineage events are OpenLineage-compatible evidence, not a deployed backend integration.",
             "Business data is synthetic and fixed-seed; findings demonstrate method, not live operations.",
