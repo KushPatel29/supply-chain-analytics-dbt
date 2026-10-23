@@ -63,6 +63,12 @@ jobs:
           "$RUNNER_TEMP/dbt/bin/python" orchestration/airflow/check_built_marts.py \
             target/supply_chain.duckdb "$AIRFLOW_HOME/run_summary.json"
 
+      # Task log paths contain colons (run_id=scheduled__...T06:00:00), which
+      # artifact upload refuses, so the logs travel as one archive.
+      - name: Archive the task logs
+        if: always()
+        run: tar -czf "$AIRFLOW_HOME/task-logs.tgz" -C "$AIRFLOW_HOME" logs || true
+
       - name: Keep the run summary, the logs and the scheduler log
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,5 +78,5 @@ jobs:
             ${{ runner.temp }}/airflow/run_summary.json
             ${{ runner.temp }}/airflow/marts.json
             ${{ runner.temp }}/airflow/scheduler.log
-            ${{ runner.temp }}/airflow/logs/
+            ${{ runner.temp }}/airflow/task-logs.tgz
           if-no-files-found: warn
