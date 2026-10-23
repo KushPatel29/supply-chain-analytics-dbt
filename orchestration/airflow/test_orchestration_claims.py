@@ -1,52 +1,54 @@
 """What the documents say about Airflow must match what CI does with it.
 
-The portfolio site claimed for weeks that CI "actually executes" this DAG and
-that it "is executed in CI rather than described". It never has: the job below
-installs Airflow and loads the DAG through a DagBag, which proves it imports and
-has the right task graph, and stops there. Validating a DAG and running one are
-different claims, and the stronger one was on the surface a reviewer reads first.
+For a long time CI only imported this DAG through a DagBag, and this file held
+the documents to that: the portfolio site had once claimed CI "actually
+executes" the DAG when it never had. In October 2026 a real run was added
+(.github/workflows/airflow-run.yml): Airflow's own scheduler, on a throwaway
+runner, creates the run from the DAG's schedule and executes every task. The
+first real runs found two defects no import test could (a working directory
+that vanished between tasks, and a snapshot the tests needed but no task built).
 
-So the claim is pinned to the mechanism. If a real task execution is ever added,
-this fails and asks for the prose to be upgraded with it — which is the right
-direction for that failure to point.
+So the claim is pinned to the new mechanism: the run must come from the
+scheduler, not from a hand-triggered `dags test`, and the prose may say the DAG
+runs nightly in CI but must not dress that up as a production deployment.
 """
 
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+CI = ROOT / ".github" / "workflows" / "ci.yml"
+RUN = ROOT / ".github" / "workflows" / "airflow-run.yml"
+SCRIPT = ROOT / "orchestration" / "airflow" / "run_with_scheduler.sh"
 README = ROOT / "README.md"
 
 
-def test_ci_validates_the_dag_and_does_not_run_it():
-    ci = WORKFLOW.read_text(encoding="utf-8")
-    assert "test_dag_integrity.py" in ci, "the DagBag integrity test is no longer run in CI"
+def test_ci_still_validates_the_dag_on_every_push():
+    assert "test_dag_integrity.py" in CI.read_text(encoding="utf-8")
 
-    # `airflow tasks test` / `airflow dags test` / `airflow dags backfill` are the
-    # commands that would actually execute something. None should be here while
-    # the documents describe validation only.
-    executing = re.findall(r"airflow\s+(?:tasks|dags)\s+(?:test|backfill|trigger|run)", ci)
-    assert not executing, (
-        f"CI now executes the DAG ({executing}). That is a stronger and better claim than "
-        "the README and the portfolio site currently make - update their wording to match, "
-        "then relax this test."
+
+def test_a_real_scheduler_runs_the_dag_every_night():
+    run = RUN.read_text(encoding="utf-8")
+    assert re.search(r"schedule:\s*\n\s*- cron:", run), "the run is no longer nightly"
+    assert "run_with_scheduler.sh" in run and "check_built_marts.py" in run
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert "airflow scheduler" in script and "dags unpause" in script
+    # The point is that the scheduler makes the run. A hand-triggered or
+    # in-process run would prove less, so none may creep in.
+    shortcut = re.findall(r"\b(?:dags|tasks)\s+(?:test|backfill|trigger|run)\b", script + run)
+    assert not shortcut, f"the run no longer comes from the scheduler: {shortcut}"
+    assert "created_by" in (ROOT / "orchestration" / "airflow" / "check_built_marts.py").read_text(
+        encoding="utf-8"
     )
 
 
-def test_the_readme_claims_validation_rather_than_execution():
+def test_the_readme_claims_a_ci_run_and_not_production():
     prose = README.read_text(encoding="utf-8")
-    assert "imports the DAG with a DagBag" in prose, (
-        "the README no longer describes the DagBag import; say what CI does with the DAG"
-    )
-    # "orchestrated nightly" sat on a badge here and read as a running schedule.
-    # Badge text is URL-encoded, so the spaces arrive as %20 -- checking only the
-    # human-readable form let the badge keep the overclaim through a mutation
-    # test of this very assertion. Both spellings are checked.
-    overclaims = ["orchestrated nightly", "CI actually runs", "CI actually executes",
-                  "executed in CI rather than described"]
     flat = prose.replace("%20", " ")
+    assert "imports the DAG with a DagBag" in prose
+    assert "scheduler" in flat and "runs nightly in CI" in flat
+    assert "not a production deployment" in flat
+    overclaims = ["in production", "production Airflow", "orchestrated nightly in production",
+                  "deployed Airflow", "Airflow cluster"]
     for overclaim in overclaims:
-        assert overclaim not in flat, (
-            f"README claims {overclaim!r}, but CI only imports and inspects the DAG"
-        )
+        assert overclaim not in flat, f"README claims {overclaim!r}; CI runs a throwaway scheduler"

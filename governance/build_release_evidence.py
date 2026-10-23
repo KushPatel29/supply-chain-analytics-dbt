@@ -2,8 +2,8 @@
 
 The packet deliberately distinguishes evidence we execute in CI (DuckDB build,
 contracts, reconciliations), evidence recorded from dated runs on other engines
-(Databricks and Snowflake), and production-shaped examples we only validate
-(the Airflow DAG).
+(Databricks and Snowflake), and the Airflow DAG, which a throwaway scheduler
+runs nightly in CI but which is not deployed anywhere.
 """
 
 from __future__ import annotations
@@ -278,7 +278,7 @@ def build_release_packet() -> dict[str, Any]:
         "scope": "Local DuckDB analytics build and committed synthetic dataset",
         "boundaries": [
             "Databricks and Snowflake builds are dated, recorded runs reconciled to DuckDB, not executed in CI.",
-            "Airflow DAG is imported and structurally tested in CI, not scheduled here.",
+            "Airflow DAG runs nightly in CI under a throwaway scheduler; it is not a production deployment.",
             "Lineage events are OpenLineage-compatible evidence, not a deployed backend integration.",
             "Business data is synthetic and fixed-seed; findings demonstrate method, not live operations.",
         ],

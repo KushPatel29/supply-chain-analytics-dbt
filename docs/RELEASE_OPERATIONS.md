@@ -50,8 +50,10 @@ python governance/build_release_evidence.py --write-baseline
 - Treat a reconciliation failure as a data-product incident even when SQL
   completes successfully. The executive mart is not publishable until the
   governed definition ties out.
-- The Airflow DAG is imported and structurally tested in CI. Scheduling,
-  credentials, alerts and SLA operations require a real Airflow environment.
+- The Airflow DAG is imported on every push and run nightly in CI by a
+  throwaway Airflow scheduler (.github/workflows/airflow-run.yml). Credentials,
+  alerting, SLA monitoring and a persistent scheduler still require a real
+  Airflow environment.
 - The Snowflake and Databricks targets are proven by dated, recorded runs
   (docs/snowflake, docs/databricks), each reconciled mart by mart to DuckDB.
   CI does not rerun them: rerun deploy.sql or the Databricks steps after a

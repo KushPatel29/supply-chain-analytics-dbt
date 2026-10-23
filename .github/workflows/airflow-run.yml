@@ -1,0 +1,76 @@
+name: Airflow scheduler run
+
+# Every night, and on any change to the DAG or the dbt project: install
+# Airflow, start its scheduler on a throwaway runner, unpause the DAG and let
+# the scheduler create and execute the run from the DAG's own schedule. The job
+# fails unless the scheduler made the run and every task in it succeeded.
+# This is a real Airflow run on CI hardware, not a production deployment.
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  push:
+    branches: [master, main]
+    paths:
+      - "orchestration/airflow/**"
+      - "models/**"
+      - "seeds/**"
+      - "snapshots/**"
+      - "tests/**"
+      - "macros/**"
+      - "dbt_project.yml"
+      - "packages.yml"
+      - "profiles.yml"
+      - ".github/workflows/airflow-run.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduler-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow (constrained)
+        run: |
+          pip install "apache-airflow==2.10.5" --constraint \
+            "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+
+      # dbt lives in its own environment so Airflow's constraints cannot pin it.
+      - name: Install dbt beside Airflow
+        run: |
+          python -m venv "$RUNNER_TEMP/dbt"
+          "$RUNNER_TEMP/dbt/bin/pip" install dbt-duckdb
+          {
+            echo "AIRFLOW_HOME=$RUNNER_TEMP/airflow"
+            echo "DBT_BIN=$RUNNER_TEMP/dbt/bin/dbt"
+            echo "DBT_PROJECT_DIR=$GITHUB_WORKSPACE"
+          } >> "$GITHUB_ENV"
+
+      - name: Run the DAG under a real scheduler
+        run: |
+          mkdir -p "$AIRFLOW_HOME"
+          bash orchestration/airflow/run_with_scheduler.sh
+
+      - name: Check what the run built
+        run: |
+          "$RUNNER_TEMP/dbt/bin/python" orchestration/airflow/check_built_marts.py \
+            target/supply_chain.duckdb "$AIRFLOW_HOME/run_summary.json"
+
+      - name: Keep the run summary, the logs and the scheduler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airflow-scheduler-run
+          path: |
+            ${{ runner.temp }}/airflow/run_summary.json
+            ${{ runner.temp }}/airflow/marts.json
+            ${{ runner.temp }}/airflow/scheduler.log
+            ${{ runner.temp }}/airflow/logs/
+          if-no-files-found: warn

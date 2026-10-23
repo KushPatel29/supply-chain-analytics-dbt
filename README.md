@@ -7,7 +7,7 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-local%20target-FFF000?logo=duckdb&logoColor=black)
 ![Databricks](https://img.shields.io/badge/Databricks-built%20%26%20reconciled%20on%20Free%20Edition-FF3621?logo=databricks&logoColor=white)
 ![Snowflake](https://img.shields.io/badge/Snowflake-built%20%26%20reconciled%20with%20dbt%20Projects%20on%20Snowflake-29B5E8?logo=snowflake&logoColor=white)
-![Airflow](https://img.shields.io/badge/Airflow-DAG%20validated%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
+![Airflow](https://img.shields.io/badge/Airflow-scheduler%20runs%20it%20nightly%20in%20CI-017CEE?logo=apacheairflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/dbt%20tests-157%20across%2015%20models-3B8C6E)
 ![Release](https://img.shields.io/badge/release%20packet-APPROVE-167D5A)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
@@ -16,7 +16,7 @@ The [Supply Chain Control Tower](https://github.com/KushPatel29/supply-chain-con
 star schema, rebuilt the analytics-engineering way: dbt seeds → staging views
 → dimensional marts, with tests as the deployment gate, generated docs and
 lineage, an exposure declaring the downstream Power BI report, and a
-production-shaped Airflow DAG that CI structurally validates.
+production-shaped Airflow DAG that a real Airflow scheduler runs nightly in CI.
 
 It now also behaves like a releasable data product. The executive KPI mart has
 an **enforced contract**; governed revenue and OTIF definitions reconcile to
@@ -42,8 +42,9 @@ Review the [release memo](output/analytics_engineering_release_memo.md),
 [change-impact inventory](output/change_impact.csv), and
 [operator runbook](docs/RELEASE_OPERATIONS.md). The packet states the evidence
 boundary plainly: DuckDB is executed in CI; Databricks and Snowflake were
-executed and reconciled by hand on dated runs (below), not on a schedule. Airflow is
-imported and structurally tested; it is not scheduled from this portfolio.
+executed and reconciled by hand on dated runs (below), not on a schedule. The
+Airflow DAG runs nightly in CI under Airflow's own scheduler on a throwaway runner:
+a real run, not a production deployment.
 
 Runs locally on **DuckDB with zero setup** (`dbt build`, done), and the same
 project, unchanged but for one cast, builds on **Databricks** and on
@@ -308,8 +309,35 @@ deployed.
 [`orchestration/airflow/supply_chain_dbt_dag.py`](orchestration/airflow/supply_chain_dbt_dag.py)
 is the nightly production DAG: `dbt deps → seed → run (staging → marts, as a
 TaskGroup) → test`, with retries, an SLA on the marts build, and email on
-failure. CI installs Airflow and **imports the DAG with a DagBag**, asserting
-the task graph — a broken DAG fails the pull request, not the 6 a.m. run.
+failure. On every push CI installs Airflow and **imports the DAG with a DagBag**,
+asserting the task graph, so a broken DAG fails the pull request.
+
+**And it runs.** Every night, and on any change to the DAG or the models,
+[`airflow-run.yml`](.github/workflows/airflow-run.yml) starts an Airflow
+scheduler on a throwaway GitHub runner, unpauses the DAG and lets the scheduler
+create the run from the DAG's own schedule
+([`run_with_scheduler.sh`](orchestration/airflow/run_with_scheduler.sh)); nothing
+triggers it by hand. The job fails unless the scheduler made the run, all six
+tasks succeeded and every mart and the price snapshot hold rows
+([`check_built_marts.py`](orchestration/airflow/check_built_marts.py)). The
+scheduler runs nightly in CI; that is a real Airflow run on CI hardware, not a
+production deployment.
+
+Running it for the first time found two defects that the DagBag checks
+could not:
+
+- **Every task built into a directory that then vanished.** `BashOperator`
+  starts each task in a fresh temporary directory, and the DuckDB profile's
+  relative path went with it, so `dbt_seed` loaded a database the next task
+  never saw. The first run failed at `dbt_seed`; every task now runs in the
+  project directory.
+- **The tests needed a table nothing built.** `dbt build` runs snapshots; a DAG
+  that splits `run` and `test` has to ask for them, and this one did not, so the
+  first run that got that far failed at `dbt_test` on the missing SCD2 price
+  snapshot. A `snapshot_prices` task now runs beside the marts.
+
+The DAG also caps itself at one active run, since two would write the same
+DuckDB file.
 
 ## Exposure
 
@@ -332,8 +360,8 @@ output/               integrity-hashed packet, memo, impact CSV and run lineage
 docs/                  insights, lineage visual and release operations runbook
 docs/databricks/       the recorded Databricks run and its reconciliation
 docs/snowflake/        deploy.sql, the recorded Snowflake run, its query result and reconciliation
-orchestration/airflow/  nightly DAG + DagBag integrity tests (run in CI)
+orchestration/airflow/  nightly DAG, DagBag tests, and the scheduler run CI does nightly
 profiles.yml          duckdb (default), databricks (run) and snowflake (run) targets
-.github/workflows/    CI: full dbt build on DuckDB + Airflow DAG validation
+.github/workflows/    CI: dbt build on DuckDB, DAG validation, nightly Airflow scheduler run
                       and the snowflake-deploy branch (master + dbt_packages)
 ```

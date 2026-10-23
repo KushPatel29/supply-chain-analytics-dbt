@@ -20,6 +20,6 @@ downstream Power BI exposure.
 ## Evidence boundaries
 
 - Snowflake target is configured but not executed in CI.
-- Airflow DAG is imported and structurally tested in CI, not scheduled here.
+- Airflow DAG runs nightly in CI under a throwaway scheduler; it is not a production deployment.
 - Lineage events are OpenLineage-compatible evidence, not a deployed backend integration.
 - Business data is synthetic and fixed-seed; findings demonstrate method, not live operations.
