@@ -6,9 +6,9 @@
 #   export DATABRICKS_HOST=dbc-xxxx.cloud.databricks.com
 #   export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<id>
 #   dbt build --profiles-dir . --target databricks
-# The snowflake target is production-shaped but has never been run: switch with
-#   dbt build --profiles-dir . --target snowflake
-# after exporting SNOWFLAKE_ACCOUNT / _USER / _PASSWORD.
+# The snowflake target is for dbt Projects on Snowflake, which runs the project
+# inside Snowflake as the signed-in user: account and user stay empty and no
+# password exists anywhere. See "Run it on Snowflake" in the README.
 supply_chain_analytics:
   target: duckdb
   outputs:
@@ -26,11 +26,10 @@ supply_chain_analytics:
       threads: 4
     snowflake:
       type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
-      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
-      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
-      role: TRANSFORMER
-      database: ANALYTICS
-      warehouse: TRANSFORMING
-      schema: supply_chain
+      account: ""
+      user: ""
+      role: SYSADMIN
+      database: SUPPLY_CHAIN
+      warehouse: DBT_WH
+      schema: analytics
       threads: 8
