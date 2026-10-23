@@ -63,6 +63,15 @@ jobs:
           "$RUNNER_TEMP/dbt/bin/python" orchestration/airflow/check_built_marts.py \
             target/supply_chain.duckdb "$AIRFLOW_HOME/run_summary.json"
 
+      # The summary as annotations too, so the run can be read without
+      # downloading the artifact.
+      - name: Report the run
+        if: always()
+        run: |
+          python -c "import json; s=json.load(open('$AIRFLOW_HOME/run_summary.json')); print('::notice title=Airflow run::' + json.dumps({k: s[k] for k in ('run_id', 'created_by', 'state', 'started', 'ended', 'seconds')}))" || true
+          python -c "import json; s=json.load(open('$AIRFLOW_HOME/run_summary.json')); print('::notice title=Airflow tasks::' + json.dumps([[t['task_id'], t['state'], t['seconds']] for t in s['tasks']]))" || true
+          python -c "import json; m=json.load(open('$AIRFLOW_HOME/marts.json')); print('::notice title=Marts built::' + json.dumps(m))" || true
+
       # Task log paths contain colons (run_id=scheduled__...T06:00:00), which
       # artifact upload refuses, so the logs travel as one archive.
       - name: Archive the task logs
