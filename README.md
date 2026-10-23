@@ -337,7 +337,10 @@ could not:
   snapshot. A `snapshot_prices` task now runs beside the marts.
 
 The DAG also caps itself at one active run, since two would write the same
-DuckDB file.
+DuckDB file. The first green CI run (23 October 2026,
+[record](orchestration/airflow/first_ci_run.json)): the scheduler created
+`scheduled__2026-10-22T06:00:00+00:00` itself, and all six tasks succeeded in
+36.7 seconds.
 
 ## Exposure
 
