@@ -64,6 +64,9 @@ jobs:
       - name: Gate the analytics release and emit audit evidence
         run: python governance/build_release_evidence.py
 
+      - name: Exercise real dbt historical backfill and breaking-schema recovery
+        run: python governance/recovery_drill.py
+
   airflow-dag-integrity:
     runs-on: ubuntu-24.04
     steps:

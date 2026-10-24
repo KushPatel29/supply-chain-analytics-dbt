@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "executed_at_utc": "2026-10-24T21:06:03.974722+00:00",
+  "environment": "temporary local DuckDB; actual dbt subprocesses",
+  "boundary": "No cloud deployment, source deletion capture or production SLA is claimed.",
+  "checks": {
+    "old_correction_outside_default_window_detected": true,
+    "historical_backfill_changed_old_record": true,
+    "backfill_is_idempotent": true,
+    "breaking_schema_rejected_and_mart_preserved": true,
+    "schema_recovery_restored_same_mart": true,
+    "incomplete_backfill_request_rejected": true,
+    "repaired_incremental_equals_full_rebuild": true
+  },
+  "commands": [
+    {
+      "args": [
+        "seed",
+        "--select",
+        "raw_fact_orders"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--full-refresh"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "seed",
+        "--select",
+        "raw_fact_orders",
+        "--full-refresh"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--vars",
+        "{\"backfill_start\": \"2025-01-01\", \"backfill_end\": \"2025-01-02\"}"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--vars",
+        "{\"backfill_start\": \"2025-01-01\", \"backfill_end\": \"2025-01-02\"}"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "seed",
+        "--select",
+        "raw_fact_orders",
+        "--full-refresh"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders"
+      ],
+      "returncode": 1
+    },
+    {
+      "args": [
+        "seed",
+        "--select",
+        "raw_fact_orders",
+        "--full-refresh"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--vars",
+        "{\"backfill_start\": \"2025-01-01\", \"backfill_end\": \"2025-01-02\"}"
+      ],
+      "returncode": 0
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--vars",
+        "{\"backfill_start\":\"2024-01-01\"}"
+      ],
+      "returncode": 2
+    },
+    {
+      "args": [
+        "run",
+        "--select",
+        "+fct_orders",
+        "--full-refresh"
+      ],
+      "returncode": 0
+    }
+  ],
+  "all_checks_passed": true
+}

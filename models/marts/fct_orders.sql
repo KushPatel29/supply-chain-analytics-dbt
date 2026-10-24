@@ -6,6 +6,8 @@
     )
 }}
 
+{% set backfill = validated_backfill_window() %}
+
 with orders as (
     select * from {{ ref('stg_orders') }}
 
@@ -17,6 +19,11 @@ with orders as (
         select {{ dbt.dateadd('day', -7, "coalesce(max(order_date), '1900-01-01')") }}
         from {{ this }}
     )
+    {% if backfill.start is not none %}
+    -- Explicit historical repair, additive to the ordinary late-arrival window.
+    or (order_date >= cast('{{ backfill.start }}' as date)
+        and order_date < cast('{{ backfill.end }}' as date))
+    {% endif %}
     {% endif %}
 )
 
