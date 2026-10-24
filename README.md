@@ -24,6 +24,8 @@ their physical marts; a deterministic state comparison identifies changed
 nodes and downstream impact; and every build emits a SHA-256 integrity-hashed release
 packet plus model-level run-lineage evidence.
 
+**Historical correction and recovery:** [run the real dbt failure/recovery drill](docs/HISTORICAL_RECOVERY.md). It detects a correction outside the normal seven-day window, repairs it with a validated bounded backfill, proves idempotence and schema-failure recovery, and compares the repaired mart with a full rebuild. This is local DuckDB execution, separate from the dated cloud runs below.
+
 ## Release control room
 
 | Decision evidence | Latest result |

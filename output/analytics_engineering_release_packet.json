@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "generated_at_utc": "2026-09-17T05:05:17.292574+00:00",
+  "generated_at_utc": "2026-10-24T21:24:57.854726+00:00",
   "decision": "APPROVE",
   "scope": "Local DuckDB analytics build and committed synthetic dataset",
   "boundaries": [
-    "Snowflake target is configured but not executed in CI.",
+    "Databricks and Snowflake builds are dated, recorded runs reconciled to DuckDB, not executed in CI.",
     "Airflow DAG runs nightly in CI under a throwaway scheduler; it is not a production deployment.",
     "Lineage events are OpenLineage-compatible evidence, not a deployed backend integration.",
     "Business data is synthetic and fixed-seed; findings demonstrate method, not live operations."
@@ -97,8 +97,8 @@
     }
   },
   "change_control": {
-    "changed_nodes": 0,
-    "impacted_downstream_nodes": 0,
+    "changed_nodes": 16,
+    "impacted_downstream_nodes": 166,
     "evidence_command": "python governance/build_release_evidence.py"
   },
   "semantic_layer": {
@@ -117,5 +117,5 @@
     ]
   },
   "lineage_event_count": 15,
-  "packet_sha256": "cb3227ca09caea254eb2a4659d8b30dfc8784618973e1ab8ea2fb87bcdad08c7"
+  "packet_sha256": "32297b04df30ef0926a573c8cefa498485cbb768249280a7e94ca066aa7c1dbc"
 }
