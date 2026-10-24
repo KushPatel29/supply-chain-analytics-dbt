@@ -1,0 +1,43 @@
+name: Snowflake deploy branch
+
+# dbt Projects on Snowflake reads this repository through a Git repository
+# object. A Snowflake trial account cannot reach dbt Hub (no external access
+# integration), so the packages are installed here and published with the
+# project to the `snowflake-deploy` branch, which is what Snowflake deploys.
+# The branch is rebuilt from master on every push: never edit it by hand.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snowflake-deploy
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt and the packages Snowflake cannot download
+        run: |
+          pip install "dbt-core==1.11.*" "dbt-duckdb==1.10.*"
+          dbt deps --profiles-dir .
+
+      - name: Publish master plus dbt_packages to snowflake-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan snowflake-deploy
+          git add -f dbt_packages
+          git commit -q -m "Deploy ${GITHUB_SHA::7} with vendored dbt packages"
+          git push -f origin snowflake-deploy

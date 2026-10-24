@@ -1,0 +1,35 @@
+{
+  "run_at": "2026-10-23T20:37:25.960589+00:00",
+  "boundary": "Personal AWS free-plan project; synthetic seed; one bounded run, not production. Private demo objects expire after seven days.",
+  "region": "us-east-1",
+  "services_executed": ["S3", "AWS Glue Data Catalog", "Athena"],
+  "source_commit": "6991b8f4973eca3c90c971945e11c9466080d741",
+  "source_url": "https://raw.githubusercontent.com/KushPatel29/supply-chain-analytics-dbt/6991b8f4973eca3c90c971945e11c9466080d741/seeds/raw_fact_orders.csv",
+  "source_sha256": "3c47d8c0fd12aa85ce3bd066b3ad5cf58ce98ab5415720f5d9d7a07ef1830a0a",
+  "source_bytes": 1425165,
+  "rows": 20000,
+  "warehouse_groups": 8,
+  "query_execution_id": "5c48bbb5-95f1-48f6-b32f-0fce188fd751",
+  "query_state": "SUCCEEDED",
+  "bytes_scanned": 1425165,
+  "scan_cutoff_bytes": 10485760,
+  "engine": {"SelectedEngineVersion": "AUTO", "EffectiveEngineVersion": "Athena engine version 3"},
+  "s3_block_public_access": {"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true},
+  "s3_encryption": "AES256",
+  "reconciliation": {
+    "status": "PASS",
+    "method": "Athena decimal aggregates compared to independent Python Decimal row arithmetic in every warehouse",
+    "measures_per_warehouse": 4,
+    "actual": [
+      {"warehouse_id":1,"lines":2484,"qty_shipped":"245979.40","revenue":"6802043.53","cogs":"5201374.59"},
+      {"warehouse_id":2,"lines":2458,"qty_shipped":"248874.70","revenue":"6906081.55","cogs":"5300074.72"},
+      {"warehouse_id":3,"lines":2529,"qty_shipped":"256993.10","revenue":"7391083.81","cogs":"5623250.57"},
+      {"warehouse_id":4,"lines":2511,"qty_shipped":"248904.20","revenue":"6998040.80","cogs":"5334878.84"},
+      {"warehouse_id":5,"lines":2359,"qty_shipped":"243364.00","revenue":"7132310.14","cogs":"5443441.27"},
+      {"warehouse_id":6,"lines":2617,"qty_shipped":"260855.20","revenue":"7196404.76","cogs":"5521673.01"},
+      {"warehouse_id":7,"lines":2530,"qty_shipped":"254395.00","revenue":"7231746.25","cogs":"5511265.92"},
+      {"warehouse_id":8,"lines":2512,"qty_shipped":"256031.60","revenue":"7115332.86","cogs":"5458767.40"}
+    ]
+  },
+  "sql": "SELECT CAST(warehouse_id AS integer) AS warehouse_id, COUNT(*) AS lines,\n      CAST(SUM(COALESCE(TRY_CAST(qty_shipped AS decimal(18,2)), 0)) AS decimal(18,2)) AS qty_shipped,\n      CAST(SUM(ROUND(COALESCE(TRY_CAST(qty_shipped AS decimal(18,4)),0) * CAST(unit_price AS decimal(18,4)),2)) AS decimal(18,2)) AS revenue,\n      CAST(SUM(ROUND(COALESCE(TRY_CAST(qty_shipped AS decimal(18,4)),0) * CAST(unit_cost AS decimal(18,4)),2)) AS decimal(18,2)) AS cogs\n      FROM \"portfolio_supply_chain_demo\".\"orders_493eb4b9\" GROUP BY 1 ORDER BY 1"
+}
